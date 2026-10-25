@@ -73,13 +73,13 @@
         "name": "Power now"
       },
       "cost_total": {
-        "name": "Total cost after subsidy this month (energy + grid rent, excl. fixed fee)"
+        "name": "Total cost after subsidy this month (electricity incl. fixed monthly price + grid rent)"
       },
       "cost_energy": {
         "name": "Energy cost gross this month"
       },
       "cost_grid_rent": {
-        "name": "Grid rent after subsidy this month (incl. capacity charge, excl. fixed fee)"
+        "name": "Grid rent after subsidy this month (incl. capacity charge)"
       },
       "spot_price": {
         "name": "Spot price now"
@@ -142,10 +142,10 @@
         "name": "VAT on energy this month"
       },
       "net_norgespris_month": {
-        "name": "Net cost with Norgespris (incl. fixed fee)"
+        "name": "Net cost with Norgespris (incl. fixed monthly price)"
       },
       "net_subsidy_month": {
-        "name": "Net cost with electricity subsidy (incl. fixed fee)"
+        "name": "Net cost with electricity subsidy (incl. fixed monthly price)"
       },
       "norgespris_saves_month": {
         "name": "Norgespris saves this month"
@@ -154,16 +154,16 @@
         "name": "Energy cost gross last month"
       },
       "cost_grid_rent_last_month": {
-        "name": "Grid rent after subsidy last month (incl. capacity charge, excl. fixed fee)"
+        "name": "Grid rent after subsidy last month (incl. capacity charge)"
       },
       "cost_last_month": {
-        "name": "Total cost after subsidy last month (energy + grid rent, excl. fixed fee)"
+        "name": "Total cost after subsidy last month (electricity incl. fixed monthly price + grid rent)"
       },
       "compensation_month": {
         "name": "Compensation this month (your scheme)"
       },
       "net_cost_month": {
-        "name": "Net cost this month (your scheme, incl. fixed fee)"
+        "name": "Net cost this month (your scheme, incl. fixed monthly price)"
       },
       "live_power": {
         "name": "Power now (live)"
@@ -172,16 +172,16 @@
         "name": "Hour power this hour (forecast)"
       },
       "grid_gross_month": {
-        "name": "Grid rent before subsidy this month (incl. capacity charge, excl. fixed fee)"
+        "name": "Grid rent before subsidy this month (incl. capacity charge)"
       },
       "subsidy_applied_month": {
         "name": "Electricity subsidy applied to grid rent this month"
       },
       "fixed_month": {
-        "name": "Fixed fee this month"
+        "name": "Fixed monthly price (electricity supply) this month"
       },
       "gross_total_month": {
-        "name": "Total gross this month (energy + grid rent + fixed fee, before support)"
+        "name": "Total gross this month (electricity incl. fixed monthly price + grid rent, before support)"
       },
       "capacity_avg_kw": {
         "name": "Capacity basis this month"
@@ -217,25 +217,25 @@
         "name": "Power now (Amperium live)"
       },
       "grid_gross_last_month": {
-        "name": "Grid rent before subsidy last month (incl. capacity charge, excl. fixed fee)"
+        "name": "Grid rent before subsidy last month (incl. capacity charge)"
       },
       "subsidy_applied_last_month": {
         "name": "Subsidy deducted from grid rent last month"
       },
       "fixed_last_month": {
-        "name": "Fixed fee last month"
+        "name": "Fixed monthly price (electricity supply) last month"
       },
       "norgespris_last_month": {
         "name": "Norgespris compensation last month"
       },
       "net_cost_last_month": {
-        "name": "Net cost last month (your scheme, incl. fixed fee)"
+        "name": "Net cost last month (your scheme, incl. fixed monthly price)"
       },
       "avg_price_last_month": {
-        "name": "Average price last month (your scheme, excl. fixed fee)"
+        "name": "Average price last month (your scheme, incl. fixed monthly price)"
       },
       "avg_price_month": {
-        "name": "Average price this month (your scheme, excl. fixed fee)"
+        "name": "Average price this month (your scheme, incl. fixed monthly price)"
       }
     },
     "binary_sensor": {
@@ -283,7 +283,7 @@
   "services": {
     "hent_periode": {
       "name": "Get period",
-      "description": "Cost and consumption for a free period: energy, grid rent before and after subsidy, fixed fee, Norgespris compensation and the average price per kWh. Dates count in local time, and the end date is NOT included (2026-09-01 to 2026-10-01 is all of September). The answer is returned as response data. Amperium does not say how the fixed fee and the capacity charge are shared in a period that is not a whole month; the answer lists them separately and warns when the period spans a month end.",
+      "description": "Cost and consumption for a free period: electricity (including the fixed monthly price), grid rent before and after subsidy, Norgespris compensation and the average price per kWh. Dates count in local time, and the end date is NOT included (2026-09-01 to 2026-10-01 is all of September). The answer is returned as response data. Amperium does not say how the fixed monthly price and the capacity charge are shared in a period that is not a whole month; the answer lists them separately and warns when the period spans a month end. The fixed monthly price is part of the electricity amount, not an extra.",
       "fields": {
         "fra": {
           "name": "From",

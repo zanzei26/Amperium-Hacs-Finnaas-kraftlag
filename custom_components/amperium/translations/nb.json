@@ -73,13 +73,13 @@
         "name": "Effekt nå"
       },
       "cost_total": {
-        "name": "Total kostnad etter straumstøtte denne måneden (energi + nettleie, uten fastledd)"
+        "name": "Total kostnad etter straumstøtte denne måneden (kraft inkl. fast månedspris + nettleie)"
       },
       "cost_energy": {
         "name": "Energikostnad brutto denne måneden"
       },
       "cost_grid_rent": {
-        "name": "Nettleie etter straumstøtte denne måneden (inkl. kapasitetsledd, uten fastledd)"
+        "name": "Nettleie etter straumstøtte denne måneden (inkl. kapasitetsledd)"
       },
       "spot_price": {
         "name": "Spotpris nå"
@@ -142,10 +142,10 @@
         "name": "Mva på energi denne måneden"
       },
       "net_norgespris_month": {
-        "name": "Netto kostnad med Norgespris (inkl. fastledd)"
+        "name": "Netto kostnad med Norgespris (inkl. fast månedspris)"
       },
       "net_subsidy_month": {
-        "name": "Netto kostnad med straumstøtte (inkl. fastledd)"
+        "name": "Netto kostnad med straumstøtte (inkl. fast månedspris)"
       },
       "norgespris_saves_month": {
         "name": "Norgespris sparer denne måneden"
@@ -154,16 +154,16 @@
         "name": "Energikostnad brutto forrige måned"
       },
       "cost_grid_rent_last_month": {
-        "name": "Nettleie etter straumstøtte forrige måned (inkl. kapasitetsledd, uten fastledd)"
+        "name": "Nettleie etter straumstøtte forrige måned (inkl. kapasitetsledd)"
       },
       "cost_last_month": {
-        "name": "Total kostnad etter straumstøtte forrige måned (energi + nettleie, uten fastledd)"
+        "name": "Total kostnad etter straumstøtte forrige måned (kraft inkl. fast månedspris + nettleie)"
       },
       "compensation_month": {
         "name": "Kompensasjon denne måneden (din ordning)"
       },
       "net_cost_month": {
-        "name": "Netto kostnad denne måneden (din ordning, inkl. fastledd)"
+        "name": "Netto kostnad denne måneden (din ordning, inkl. fast månedspris)"
       },
       "live_power": {
         "name": "Effekt nå (live)"
@@ -172,16 +172,16 @@
         "name": "Timeeffekt denne timen (prognose)"
       },
       "grid_gross_month": {
-        "name": "Nettleie før straumstøtte denne måneden (inkl. kapasitetsledd, uten fastledd)"
+        "name": "Nettleie før straumstøtte denne måneden (inkl. kapasitetsledd)"
       },
       "subsidy_applied_month": {
         "name": "Straumstøtte trukket fra nettleien denne måneden"
       },
       "fixed_month": {
-        "name": "Fastledd denne måneden"
+        "name": "Fast månedspris (kraft) denne måneden"
       },
       "gross_total_month": {
-        "name": "Total brutto denne måneden (energi + nettleie + fastledd, før støtte)"
+        "name": "Total brutto denne måneden (kraft inkl. fast månedspris + nettleie, før støtte)"
       },
       "capacity_avg_kw": {
         "name": "Kapasitetsgrunnlag denne måneden"
@@ -217,25 +217,25 @@
         "name": "Effekt nå (Amperium live)"
       },
       "grid_gross_last_month": {
-        "name": "Nettleie før straumstøtte forrige måned (inkl. kapasitetsledd, uten fastledd)"
+        "name": "Nettleie før straumstøtte forrige måned (inkl. kapasitetsledd)"
       },
       "subsidy_applied_last_month": {
         "name": "Straumstøtte trukket fra nettleien forrige måned"
       },
       "fixed_last_month": {
-        "name": "Fastledd forrige måned"
+        "name": "Fast månedspris (kraft) forrige måned"
       },
       "norgespris_last_month": {
         "name": "Norgespris-kompensasjon forrige måned"
       },
       "net_cost_last_month": {
-        "name": "Netto kostnad forrige måned (din ordning, inkl. fastledd)"
+        "name": "Netto kostnad forrige måned (din ordning, inkl. fast månedspris)"
       },
       "avg_price_last_month": {
-        "name": "Snittpris forrige måned (din ordning, uten fastledd)"
+        "name": "Snittpris forrige måned (din ordning, inkl. fast månedspris)"
       },
       "avg_price_month": {
-        "name": "Snittpris denne måneden (din ordning, uten fastledd)"
+        "name": "Snittpris denne måneden (din ordning, inkl. fast månedspris)"
       }
     },
     "binary_sensor": {
@@ -283,7 +283,7 @@
   "services": {
     "hent_periode": {
       "name": "Hent periode",
-      "description": "Kostnad og forbruk for en valgfri periode: energi, nettleie før og etter støtte, fastledd, Norgespris-kompensasjon og snittpris per kWh. Datoer regnes i lokal tid, og sluttdatoen er IKKE med (2026-09-01 til 2026-10-01 er hele september). Svaret gis som responsdata. Amperium oppgir ikke hvordan fastledd og kapasitetsledd fordeles i en periode som ikke er en hel måned; svaret viser dem hver for seg og advarer når perioden går over et månedsskifte.",
+      "description": "Kostnad og forbruk for en valgfri periode: kraft (inkl. fast månedspris), nettleie før og etter støtte, Norgespris-kompensasjon og snittpris per kWh. Datoer regnes i lokal tid, og sluttdatoen er IKKE med (2026-09-01 til 2026-10-01 er hele september). Svaret gis som responsdata. Amperium oppgir ikke hvordan den faste månedsprisen og kapasitetsleddet fordeles i en periode som ikke er en hel måned; svaret viser dem hver for seg og advarer når perioden går over et månedsskifte. Den faste månedsprisen er en del av kraft, ikke et tillegg.",
       "fields": {
         "fra": {
           "name": "Fra",

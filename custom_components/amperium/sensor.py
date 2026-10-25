@@ -53,6 +53,7 @@ from .derived import (
     net_with_subsidy,
     price_per_kwh,
     subsidy_applied,
+    vat_with_fixed_price,
 )
 from .live import LivePowerTracker
 
@@ -288,7 +289,6 @@ SENSORS: tuple[AmperiumSensorDescription, ...] = (
             net_for_scheme(
                 d.get("scheme"),
                 d.get("cost_last_month"),
-                d.get("fixed_total_last_month"),
                 subsidy_applied(d.get("grid_compensation_last_month")),
                 d.get("norgespris_last_month"),
             ),
@@ -371,9 +371,7 @@ SENSORS: tuple[AmperiumSensorDescription, ...] = (
         icon="mdi:cash-multiple",
         suggested_display_precision=2,
         value_fn=lambda d: _round(
-            gross_total_from_net(
-                d.get("cost_total"), d.get("fixed_total"), d.get("grid_compensation")
-            ),
+            gross_total_from_net(d.get("cost_total"), d.get("grid_compensation")),
             2,
         ),
     ),
@@ -452,7 +450,12 @@ SENSORS: tuple[AmperiumSensorDescription, ...] = (
         native_unit_of_measurement="kr",
         icon="mdi:percent",
         suggested_display_precision=2,
-        value_fn=lambda d: _round(d.get("vat_month"), 2),
+        value_fn=lambda d: _round(
+            vat_with_fixed_price(
+                d.get("vat_month"), d.get("energy_gross_month"), d.get("fixed_total")
+            ),
+            2,
+        ),
     ),
     AmperiumSensorDescription(
         key="compensation_month",
@@ -479,7 +482,6 @@ SENSORS: tuple[AmperiumSensorDescription, ...] = (
             net_for_scheme(
                 d.get("scheme"),
                 d.get("cost_total"),
-                d.get("fixed_total"),
                 subsidy_applied(d.get("grid_compensation")),
                 d.get("norgespris_month"),
             ),
@@ -496,7 +498,6 @@ SENSORS: tuple[AmperiumSensorDescription, ...] = (
         value_fn=lambda d: _round(
             net_with_norgespris(
                 d.get("cost_total"),
-                d.get("fixed_total"),
                 subsidy_applied(d.get("grid_compensation")),
                 d.get("norgespris_month"),
             ),
@@ -510,9 +511,7 @@ SENSORS: tuple[AmperiumSensorDescription, ...] = (
         icon="mdi:cash-check",
         suggested_display_precision=2,
         entity_registry_enabled_default=False,
-        value_fn=lambda d: _round(
-            net_with_subsidy(d.get("cost_total"), d.get("fixed_total")), 2
-        ),
+        value_fn=lambda d: _round(net_with_subsidy(d.get("cost_total")), 2),
     ),
     AmperiumSensorDescription(
         key="norgespris_saves_month",

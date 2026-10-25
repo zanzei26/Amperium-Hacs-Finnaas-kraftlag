@@ -6,20 +6,21 @@
 # opprettet; plassholderne under er forkortet.
 #
 # Slik henger tallene sammen (se README, «Kostnad: brutto, støtte og netto»):
-#   Total brutto = energi + nettleie før støtte + fastledd
+#   Total brutto = kraft (inkl. fast månedspris) + nettleie før støtte
 #   Netto        = Total brutto − kompensasjon for din ordning
-# Amperiums egen månedstotal er allerede ETTER straumstøtte og uten fastledd.
+# Amperiums egen månedstotal er allerede ETTER straumstøtte. Kraftavtalens faste
+# månedspris (25 kr) ligger i kraft-beløpet og er ikke et tillegg.
 
 type: entities
 title: Kostnad denne måneden
 state_color: true
 entities:
   - entity: sensor.amperium_energikostnad_brutto_denne_maneden
-    name: Energi (brutto, inkl. mva)
+    name: Kraft (brutto, inkl. mva og fast månedspris)
+  - entity: sensor.amperium_fastledd_denne_maneden
+    name: Herav fast månedspris (ligger i kraft)
   - entity: sensor.amperium_nettleie_for_straumstotte_denne_maneden
     name: Nettleie før straumstøtte (inkl. kapasitetsledd)
-  - entity: sensor.amperium_fastledd_denne_maneden
-    name: Fastledd
   - type: divider
   - entity: sensor.amperium_total_brutto_denne_maneden
     name: Total brutto
@@ -47,7 +48,7 @@ entities:
   - type: section
     label: Forrige måned
   - entity: sensor.amperium_total_kostnad_etter_straumstotte_forrige_maned
-    name: Total etter støtte (uten fastledd)
+    name: Total etter støtte (kraft inkl. fast månedspris + nettleie)
   - entity: sensor.amperium_kapasitetsgrunnlag_forrige_maned
     name: Kapasitetsgrunnlag
   - entity: sensor.amperium_kapasitetsledd_forrige_maned
