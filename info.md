@@ -19,6 +19,7 @@ Strømforbruk, kostnad og pris **direkte fra Finnås Kraftlag** via Amperium-pla
 - Timeforbruk importert som statistikk til Energidashbordet (velg «Amperium forbruk»)
 - HAN-måler online (binær)
 - Når innloggingen utløper (diagnostikk), med varsel i god tid
+- Strømregnskap: nettleie før støtte, fastledd, Norgespris og snittpris for forrige måned, og handlingen `amperium.hent_periode` for valgfrie perioder
 
 ## Oppsett
 1. Installer via HACS og start Home Assistant på nytt.

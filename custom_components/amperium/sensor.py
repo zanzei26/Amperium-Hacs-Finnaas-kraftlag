@@ -44,11 +44,14 @@ from .derived import (
     compensation_for_scheme,
     consumer_price,
     gross_grid_from_net,
+    gross_grid_rent,
     gross_total_from_net,
     han_signal_state,
+    house_cost,
     net_for_scheme,
     net_with_norgespris,
     net_with_subsidy,
+    price_per_kwh,
     subsidy_applied,
 )
 from .live import LivePowerTracker
@@ -239,6 +242,98 @@ SENSORS: tuple[AmperiumSensorDescription, ...] = (
         icon="mdi:cash-multiple",
         suggested_display_precision=2,
         value_fn=lambda d: _round(d.get("cost_last_month"), 2),
+    ),
+    AmperiumSensorDescription(
+        key="grid_gross_last_month",
+        translation_key="grid_gross_last_month",
+        native_unit_of_measurement="kr",
+        icon="mdi:transmission-tower",
+        suggested_display_precision=2,
+        value_fn=lambda d: _round(
+            gross_grid_rent(d.get("grid_total_last_month"), d.get("grid_compensation_last_month")),
+            2,
+        ),
+    ),
+    AmperiumSensorDescription(
+        key="subsidy_applied_last_month",
+        translation_key="subsidy_applied_last_month",
+        native_unit_of_measurement="kr",
+        icon="mdi:cash-plus",
+        suggested_display_precision=2,
+        value_fn=lambda d: _round(subsidy_applied(d.get("grid_compensation_last_month")), 2),
+    ),
+    AmperiumSensorDescription(
+        key="fixed_last_month",
+        translation_key="fixed_last_month",
+        native_unit_of_measurement="kr",
+        icon="mdi:calendar-month",
+        suggested_display_precision=2,
+        value_fn=lambda d: _round(d.get("fixed_total_last_month"), 2),
+    ),
+    AmperiumSensorDescription(
+        key="norgespris_last_month",
+        translation_key="norgespris_last_month",
+        native_unit_of_measurement="kr",
+        icon="mdi:cash-plus",
+        suggested_display_precision=2,
+        value_fn=lambda d: _round(d.get("norgespris_last_month"), 2),
+    ),
+    AmperiumSensorDescription(
+        key="net_cost_last_month",
+        translation_key="net_cost_last_month",
+        native_unit_of_measurement="kr",
+        icon="mdi:cash-check",
+        suggested_display_precision=2,
+        value_fn=lambda d: _round(
+            net_for_scheme(
+                d.get("scheme"),
+                d.get("cost_last_month"),
+                d.get("fixed_total_last_month"),
+                subsidy_applied(d.get("grid_compensation_last_month")),
+                d.get("norgespris_last_month"),
+            ),
+            2,
+        ),
+    ),
+    AmperiumSensorDescription(
+        key="avg_price_last_month",
+        translation_key="avg_price_last_month",
+        native_unit_of_measurement="kr/kWh",
+        icon="mdi:cash-clock",
+        suggested_display_precision=4,
+        value_fn=lambda d: _round(
+            price_per_kwh(
+                house_cost(
+                    d.get("scheme"),
+                    d.get("cost_energy_last_month"),
+                    d.get("cost_grid_rent_last_month"),
+                    d.get("grid_compensation_last_month"),
+                    d.get("norgespris_last_month"),
+                ),
+                d.get("energy_last_month"),
+            ),
+            4,
+        ),
+    ),
+    AmperiumSensorDescription(
+        key="avg_price_month",
+        translation_key="avg_price_month",
+        native_unit_of_measurement="kr/kWh",
+        icon="mdi:cash-clock",
+        suggested_display_precision=4,
+        value_fn=lambda d: _round(
+            price_per_kwh(
+                house_cost(
+                    d.get("scheme"),
+                    d.get("cost_energy"),
+                    d.get("cost_grid_rent"),
+                    d.get("grid_compensation"),
+                    d.get("norgespris_month"),
+                ),
+                d.get("energy_month"),
+            ),
+            4,
+        ),
     ),
     AmperiumSensorDescription(
         key="grid_gross_month",
@@ -715,6 +810,8 @@ class AmperiumSensor(CoordinatorEntity[AmperiumCoordinator], SensorEntity):
             }
         if key == "grid_gross_month":
             return data.get("grid_breakdown")
+        if key == "grid_gross_last_month":
+            return data.get("grid_breakdown_last_month")
         if key == "capacity_avg_kw":
             return data.get("capacity_details")
         if key == "capacity_calc_kw":

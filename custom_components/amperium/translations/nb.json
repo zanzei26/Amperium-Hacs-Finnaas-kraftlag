@@ -215,6 +215,27 @@
       },
       "amperium_live_power": {
         "name": "Effekt nå (Amperium live)"
+      },
+      "grid_gross_last_month": {
+        "name": "Nettleie før straumstøtte forrige måned (inkl. kapasitetsledd, uten fastledd)"
+      },
+      "subsidy_applied_last_month": {
+        "name": "Straumstøtte trukket fra nettleien forrige måned"
+      },
+      "fixed_last_month": {
+        "name": "Fastledd forrige måned"
+      },
+      "norgespris_last_month": {
+        "name": "Norgespris-kompensasjon forrige måned"
+      },
+      "net_cost_last_month": {
+        "name": "Netto kostnad forrige måned (din ordning, inkl. fastledd)"
+      },
+      "avg_price_last_month": {
+        "name": "Snittpris forrige måned (din ordning, uten fastledd)"
+      },
+      "avg_price_month": {
+        "name": "Snittpris denne måneden (din ordning, uten fastledd)"
       }
     },
     "binary_sensor": {
@@ -257,6 +278,26 @@
     "login_expiring": {
       "title": "Amperium-innloggingen går snart ut",
       "description": "Amperium-innloggingen din går ut om ca. {days} dager. Logg inn på nytt med engangskode før da: åpne «Konfigurer på nytt» på integrasjonen under Innstillinger → Enheter og tjenester → Amperium."
+    }
+  },
+  "services": {
+    "hent_periode": {
+      "name": "Hent periode",
+      "description": "Kostnad og forbruk for en valgfri periode: energi, nettleie før og etter støtte, fastledd, Norgespris-kompensasjon og snittpris per kWh. Datoer regnes i lokal tid, og sluttdatoen er IKKE med (2026-09-01 til 2026-10-01 er hele september). Svaret gis som responsdata. Amperium oppgir ikke hvordan fastledd og kapasitetsledd fordeles i en periode som ikke er en hel måned; svaret viser dem hver for seg og advarer når perioden går over et månedsskifte.",
+      "fields": {
+        "fra": {
+          "name": "Fra",
+          "description": "Første dag i perioden, med (kl. 00:00 lokal tid). Dato og klokkeslett tas nøyaktig."
+        },
+        "til": {
+          "name": "Til",
+          "description": "Dagen perioden slutter: denne dagen er IKKE med (kl. 00:00 lokal tid). Dato og klokkeslett tas nøyaktig."
+        },
+        "entry_id": {
+          "name": "Oppføring",
+          "description": "Hvilken Amperium-oppføring som brukes. Trengs bare hvis du har flere."
+        }
+      }
     }
   }
 }

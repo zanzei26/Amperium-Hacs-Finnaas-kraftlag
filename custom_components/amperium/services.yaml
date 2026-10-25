@@ -1,0 +1,17 @@
+hent_periode:
+  fields:
+    fra:
+      required: true
+      example: "2026-09-01"
+      selector:
+        date:
+    til:
+      required: true
+      example: "2026-10-01"
+      selector:
+        date:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: amperium

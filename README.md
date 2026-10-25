@@ -25,6 +25,12 @@ Sensorer per anlegg:
 | «Nettleie etter straumstøtte denne måneden» | Nettleie inkl. kapasitetsledd, **etter** straumstøtte og **uten** fastledd (kr) |
 | «Total kostnad etter straumstøtte denne måneden» | Energi + nettleie som over, **uten** fastledd (kr). Dette er Amperiums eget månedstall |
 | «… forrige måned» (energi, nettleie, total) | De samme tre tallene for forrige måned (kr) |
+| «Nettleie før straumstøtte forrige måned» | Nettleie inkl. kapasitetsledd, før støtte, uten fastledd (kr) for forrige måned: «Nettleie etter straumstøtte» + støtten. Postene ligger som attributter |
+| «Straumstøtte trukket fra nettleien forrige måned» | Støtten som er trukket fra nettleien i månedstallene (kr). Gjelder ikke på Norgespris |
+| «Fastledd forrige måned» | Fast månedlig avgift forrige måned (kr) |
+| «Norgespris-kompensasjon forrige måned» | Norgespris-kompensasjon forrige måned, summert fra timedata (kr) |
+| «Netto kostnad forrige måned (din ordning, inkl. fastledd)» | Som «Netto kostnad denne måneden», men for forrige måned (kr) |
+| «Snittpris forrige måned» / «Snittpris denne måneden» (kr/kWh) | Husets snittpris uten fastledd for ordningen du har valgt, se «Strømregnskap» |
 | «Nettleie før straumstøtte denne måneden» | Nettleie inkl. kapasitetsledd, før støtte, uten fastledd (kr): «Nettleie etter straumstøtte» + støtten, så før − støtte = etter. Postene ligger som attributter (fra kostnadssvaret, kan avvike noen øre) |
 | «Fastledd denne måneden» | Fast månedlig avgift (kr). Den er ikke med i månedstallene over |
 | «Total brutto denne måneden» | Energi + nettleie + fastledd, før støtte (kr): «Total kostnad etter straumstøtte» + fastledd + støtten |
@@ -116,6 +122,31 @@ Derfor regnes sensorene slik:
 Du velger ordningen (Norgespris eller straumstøtte) når du setter opp integrasjonen, og kan endre den under **Konfigurer**. «Netto kostnad denne måneden» bruker valgt ordning. Har du ikke valgt (eldre installasjon), er den utilgjengelig til du velger.
 
 Støtten leses uten hensyn til fortegn (den er alltid et fradrag). Tallene for **forrige måned** hentes fra samme kostnadssvar: nettleie etter støtte er `gridRent.totalAmount`, total er svarets `totalAmount`, og energi er differansen (avledet). Tallene er **omtrentlige**: kompensasjon og energi summeres fra hele timer, mens månedstallene kan ligge noen timer foran eller bak. Bruk dem som peiling, ikke som faktura. Eksempelkortet [`examples/lovelace-kostnad.yaml`](examples/lovelace-kostnad.yaml) viser oppsettet.
+
+### Strømregnskap: forrige måned og valgfri periode
+
+For deg som skal fordele strømkostnaden, for eksempel til en leietaker, er snittprisen per kWh det som teller. Integrasjonen regner den slik (uten fastledd):
+
+- **Norgespris:** (kraft + nettleie **før** straumstøtte − Norgespris-kompensasjon) / forbruk. Straumstøtten gjelder ikke på Norgespris, så den legges tilbake i nettleien.
+- **Straumstøtte:** (kraft + nettleie etter straumstøtte) / forbruk.
+
+«Snittpris denne måneden» og «Snittpris forrige måned» bruker ordningen du har valgt. Sensorene for forrige måned i tabellen over viser delene hver for seg. De bygger på timedata og kostnadsoppgaver som integrasjonen allerede henter, så det er ingen ekstra henting.
+
+**Handlingen `amperium.hent_periode`** gir de samme tallene for en periode du velger selv, for eksempel en leietakers periode. Den leser bare fra Amperium og endrer ingenting. Prøv den under Utviklerverktøy → Handlinger (bruk YAML-modus):
+
+```yaml
+action: amperium.hent_periode
+data:
+  fra: "2026-09-01"
+  til: "2026-10-01"
+```
+
+- **Fra** er med og **til er ikke med**, så 2026-09-01 til 2026-10-01 er hele september, og en periode som 2026-08-30 til 2026-10-01 går fra og med 30. august til og med 30. september. Datoer regnes som kl. 00:00 lokal tid. Du kan også oppgi dato og klokkeslett, for eksempel `"2026-09-01 06:00:00"`, og det tas da nøyaktig. Perioden kan være opptil 100 dager.
+- Svaret har blant annet `consumption_kwh`, `energy_gross`, `grid_before_support`, `subsidy_applied`, `grid_after_support`, `capacity_charge`, `fixed_fee`, `norgespris_compensation`, `house_cost_norgespris`, `price_per_kwh_norgespris` (og `_subsidy` for straumstøtte), `hours_expected`, `hours_with_data` og `warnings`. Feltene `from` og `to` viser nøyaktig hvilket tidsrom som er regnet ut.
+- `energy_gross` er Amperiums totalsum for perioden (energi og nettleie etter støtte minus nettleien). `energy_gross_hourly_sum` er summen av timene. Begge vises, så du ser om de er like.
+- `warnings`: `period_not_over` (perioden er ikke ferdig, bare hele timer til nå er med), `hours_missing:N` (N timer mangler i svaret fra Amperium), `charge_hours_differ_from_consumption_hours`, `no_grid_rent_in_answer` og `period_spans_months`.
+
+**Ikke avklart:** Amperiums beskrivelse av kostnadsoppgaven sier bare «total charges for a site in a given period». Den sier ikke hvordan fastledd og kapasitetsledd fordeles i en periode som ikke er en hel måned. Derfor oppgir handlingen dem hver for seg (`capacity_charge`, `fixed_fee` og `grid_before_support_excl_capacity`) og advarer med `period_spans_months` når perioden går over et månedsskifte. Det er heller ikke bekreftet om nettleien på en faktura inkluderer fastleddet. Sammenlign `grid_before_support` og `grid_before_support + fixed_fee` med fakturaen. Handlingen og sensorene er **ikke testet mot Amperium** ennå. Kontroller tallene mot en faktura før du bruker dem.
 
 ### Kapasitetsledd
 
