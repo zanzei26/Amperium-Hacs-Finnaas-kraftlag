@@ -466,37 +466,39 @@ def gross_grid_from_net(
     return float(grid_after) + subsidy_applied(compensation)
 
 
-def gross_total_from_net(total_after: Any, fixed_total: Any, compensation: Any) -> float | None:
-    """This month's total BEFORE subsidy, including the fixed fee.
+def gross_total_from_net(total_after: Any, compensation: Any) -> float | None:
+    """This month's total BEFORE subsidy.
 
-    = total after subsidy (/api/sites) + fixed fee + subsidy, so that
-    "total before - subsidy - fixed fee = total after" holds exactly.
+    = total after subsidy (/api/sites) + subsidy, so that
+    "total before - subsidy = total after" holds exactly. The kraft's fixed monthly
+    price is already inside the total (it is part of the energy amount), so it is
+    not added again.
     """
     if compensation is None:
         return None
-    return add_amounts(total_after, fixed_total, subsidy_applied(compensation))
+    return add_amounts(total_after, subsidy_applied(compensation))
 
 
-def net_with_subsidy(site_total: Any, fixed_total: Any) -> float | None:
+def net_with_subsidy(site_total: Any) -> float | None:
     """Total cost for a customer on the regular subsidy.
 
     /api/sites totalAmount (energy + grid rent) is already after straumstotte
-    but excludes the fixed monthly fee, so only the fixed fee is added.
+    and already holds the kraft's fixed monthly price (inside the energy amount),
+    so it is the answer as it stands.
     """
-    return add_amounts(site_total, fixed_total)
+    return None if site_total is None else float(site_total)
 
 
-def net_with_norgespris(
-    site_total: Any, fixed_total: Any, subsidy: Any, norgespris: Any
-) -> float | None:
+def net_with_norgespris(site_total: Any, subsidy: Any, norgespris: Any) -> float | None:
     """Total cost for a Norgespris customer.
 
-    Start from the after-subsidy total, add the straumstotte back (it does
-    not apply on Norgespris) and subtract the Norgespris compensation.
+    Start from the after-subsidy total (the kraft's fixed monthly price is already
+    in it), add the straumstotte back (it does not apply on Norgespris) and
+    subtract the Norgespris compensation.
     """
-    if None in (site_total, fixed_total, subsidy, norgespris):
+    if None in (site_total, subsidy, norgespris):
         return None
-    return float(site_total) + float(fixed_total) + float(subsidy) - float(norgespris)
+    return float(site_total) + float(subsidy) - float(norgespris)
 
 
 def compensation_for_scheme(scheme: Any, norgespris: Any, subsidy: Any) -> float | None:
@@ -510,23 +512,23 @@ def compensation_for_scheme(scheme: Any, norgespris: Any, subsidy: Any) -> float
     return None if value is None else float(value)
 
 
-def net_for_scheme(
-    scheme: Any, site_total: Any, fixed_total: Any, subsidy: Any, norgespris: Any
-) -> float | None:
+def net_for_scheme(scheme: Any, site_total: Any, subsidy: Any, norgespris: Any) -> float | None:
     """Total cost for the scheme the customer has chosen."""
     if scheme == "norgespris":
-        return net_with_norgespris(site_total, fixed_total, subsidy, norgespris)
+        return net_with_norgespris(site_total, subsidy, norgespris)
     if scheme == "subsidy":
-        return net_with_subsidy(site_total, fixed_total)
+        return net_with_subsidy(site_total)
     return None
 
 
 def house_cost(
     scheme: Any, energy_gross: Any, grid_after: Any, compensation: Any, norgespris: Any
 ) -> float | None:
-    """The house's electricity cost for a period, without the fixed fee.
+    """The house's electricity cost for a period.
 
-    This is the number a landlord divides by the kWh to get an average price:
+    ``energy_gross`` is the invoice's Kraft, which holds the fixed monthly price, so
+    that price is in the result once. This is the number a landlord divides by the
+    kWh to get an average price:
     - Norgespris: energy + grid rent BEFORE straumstotte (it does not apply on
       Norgespris, so the subsidy is added back) - the Norgespris compensation.
     - regular subsidy: energy + grid rent after straumstotte.
@@ -557,6 +559,21 @@ def price_per_kwh(cost: Any, kwh: Any) -> float | None:
         return float(cost) / float(kwh)
     except (TypeError, ValueError):
         return None
+
+
+def vat_with_fixed_price(vat: Any, energy: Any, fixed: Any) -> float | None:
+    """VAT on the energy amount, including the VAT inside the fixed monthly price.
+
+    ``vat`` and ``energy`` are the hourly VAT and gross energy sums; the fixed
+    monthly price (kraft) is not in those hours but is part of the invoice's Kraft,
+    with VAT at the same share of the gross amount (20 % of the gross at 25 % MVA).
+    Without a fixed price or a share to derive it from, the hourly VAT is returned.
+    """
+    if vat is None:
+        return None
+    if fixed is None or not energy:
+        return float(vat)
+    return float(vat) + float(fixed) * float(vat) / float(energy)
 
 
 MAX_PERIOD_DAYS = 100
@@ -614,10 +631,12 @@ def summarise_period(
     """Cost and consumption for one free period [start, end), for a landlord's accounts.
 
     ``energy`` are hourly consumption buckets and ``charges`` is the answer from
-    ``async_get_charges`` for the same window. The grid rent, the fixed fee and the
-    energy total are the aggregates Amperium gives for the window; the Norgespris
-    compensation can only be summed from the hourly buckets. Amounts in kr, energy
-    in kWh. ``warnings`` lists anything that makes the numbers less reliable.
+    ``async_get_charges`` for the same window. The grid rent and the energy total
+    are the aggregates Amperium gives for the window; the Norgespris compensation
+    can only be summed from the hourly buckets. The energy total is the invoice's
+    Kraft: spot price and surcharge per hour plus the kraft's fixed monthly price
+    (``fixed_monthly_price``), which is part of it and not an extra. Amounts in kr,
+    energy in kWh. ``warnings`` lists anything that makes the numbers less reliable.
     """
     charges = charges or {}
     warnings: list[str] = []
@@ -630,7 +649,7 @@ def summarise_period(
         b for b in complete_hours(charges.get("energy") or [], now) if start <= b["start"] < end
     ]
     hourly_energy = sum(b["energy"] for b in charge_hours) if charge_hours else None
-    vat = sum(b["tax"] for b in charge_hours) if charge_hours else None
+    vat_hourly = sum(b["tax"] for b in charge_hours) if charge_hours else None
     norgespris = sum(b["norgespris"] for b in charge_hours) if charge_hours else None
 
     grid = charges.get("grid") or {}
@@ -643,8 +662,11 @@ def summarise_period(
     grid_before = gross_grid_rent(grid_after, compensation)
     if outer_total is not None and grid_after is not None:
         energy_gross = float(outer_total) - float(grid_after)
+    elif hourly_energy is not None and fixed is not None:
+        energy_gross = hourly_energy + float(fixed)
     else:
         energy_gross = hourly_energy
+    vat = vat_with_fixed_price(vat_hourly, hourly_energy, fixed)
 
     cost_norgespris = house_cost("norgespris", energy_gross, grid_after, compensation, norgespris)
     cost_subsidy = house_cost("subsidy", energy_gross, grid_after, compensation, norgespris)
@@ -657,6 +679,18 @@ def summarise_period(
         warnings.append("charge_hours_differ_from_consumption_hours")
     if not grid:
         warnings.append("no_grid_rent_in_answer")
+    if fixed is None:
+        warnings.append("fixed_monthly_price_missing")
+    elif (
+        outer_total is not None
+        and grid_after is not None
+        and hourly_energy is not None
+        and len(hours) == expected
+        and len(charge_hours) == len(hours)
+        and abs((energy_gross - hourly_energy) - float(fixed)) > 1.0
+    ):
+        # The total is expected to be the hours plus the fixed monthly price.
+        warnings.append("fixed_monthly_price_not_in_energy_total")
     local_first = start.astimezone(tz)
     local_last = (end - dt.timedelta(seconds=1)).astimezone(tz)
     if (local_first.year, local_first.month) != (local_last.year, local_last.month):
@@ -679,16 +713,12 @@ def summarise_period(
         "grid_before_support_excl_capacity": _r(
             None if grid_before is None or capacity is None else grid_before - float(capacity), 2
         ),
-        "fixed_fee": _r(fixed, 2),
+        "fixed_monthly_price": _r(fixed, 2),
         "norgespris_compensation": _r(norgespris, 2),
         "house_cost_norgespris": _r(cost_norgespris, 2),
         "house_cost_subsidy": _r(cost_subsidy, 2),
         "price_per_kwh_norgespris": _r(price_per_kwh(cost_norgespris, kwh), 4),
         "price_per_kwh_subsidy": _r(price_per_kwh(cost_subsidy, kwh), 4),
-        "price_per_kwh_norgespris_incl_fixed": _r(
-            price_per_kwh(None if cost_norgespris is None or fixed is None else cost_norgespris + float(fixed), kwh),
-            4,
-        ),
         "warnings": warnings,
     }
 

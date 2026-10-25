@@ -13,13 +13,13 @@ Strømforbruk, kostnad og pris **direkte fra Finnås Kraftlag** via Amperium-pla
 - Timepriser for i dag og i morgen som attributter på spotpris-sensoren
 - Forbruk i går, siste time og forrige måned, dag/natt-fordeling, energikostnad i går
 - Straumstøtte og Norgespris-sammenligning
-- Nettleie med kapasitetsledd, fastledd og total brutto/netto for din ordning (Norgespris eller straumstøtte)
+- Nettleie med kapasitetsledd, kraftavtalens faste månedspris og total brutto/netto for din ordning (Norgespris eller straumstøtte)
 - Valgfri live effekt fra en sensor du har fra før (f.eks. Tibber Pulse)
 - Valgfri, eksperimentell live effekt direkte fra Amperium for deg med Dobbe-modul (samme sanntidsstrøm som appen). Du velger ved oppsett om du har modulen
 - Timeforbruk importert som statistikk til Energidashbordet (velg «Amperium forbruk»)
 - HAN-måler online (binær)
 - Når innloggingen utløper (diagnostikk), med varsel i god tid
-- Strømregnskap: nettleie før støtte, fastledd, Norgespris og snittpris for forrige måned, og handlingen `amperium.hent_periode` for valgfrie perioder
+- Strømregnskap: nettleie før støtte, fast månedspris, Norgespris og snittpris for forrige måned, og handlingen `amperium.hent_periode` for valgfrie perioder
 
 ## Oppsett
 1. Installer via HACS og start Home Assistant på nytt.
