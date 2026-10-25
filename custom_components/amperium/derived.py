@@ -299,12 +299,13 @@ def summarise_charges(
     if not hours:
         return {}
     now_local = now.astimezone(tz)
-    _, this_start, _ = local_month_bounds(now_local)
+    prev_start, this_start, _ = local_month_bounds(now_local)
     yesterday = (now_local - dt.timedelta(days=1)).date()
 
     out: dict[str, Any] = {}
     cost = gross = tax = norgespris = 0.0
-    have_cost = have_month = False
+    last_gross = last_tax = last_norgespris = 0.0
+    have_cost = have_month = have_last = False
     for bucket in hours:
         local = bucket["start"].astimezone(tz)
         if local.date() == yesterday:
@@ -315,12 +316,21 @@ def summarise_charges(
             tax += bucket["tax"]
             norgespris += bucket["norgespris"]
             have_month = True
+        elif (local.year, local.month) == (prev_start.year, prev_start.month):
+            last_gross += bucket["energy"]
+            last_tax += bucket["tax"]
+            last_norgespris += bucket["norgespris"]
+            have_last = True
     if have_cost:
         out["cost_yesterday"] = cost
     if have_month:
         out["energy_gross_month"] = gross
         out["vat_month"] = tax
         out["norgespris_month"] = norgespris
+    if have_last:
+        out["energy_gross_last_month"] = last_gross
+        out["vat_last_month"] = last_tax
+        out["norgespris_last_month"] = last_norgespris
     return out
 
 
@@ -509,6 +519,178 @@ def net_for_scheme(
     if scheme == "subsidy":
         return net_with_subsidy(site_total, fixed_total)
     return None
+
+
+def house_cost(
+    scheme: Any, energy_gross: Any, grid_after: Any, compensation: Any, norgespris: Any
+) -> float | None:
+    """The house's electricity cost for a period, without the fixed fee.
+
+    This is the number a landlord divides by the kWh to get an average price:
+    - Norgespris: energy + grid rent BEFORE straumstotte (it does not apply on
+      Norgespris, so the subsidy is added back) - the Norgespris compensation.
+    - regular subsidy: energy + grid rent after straumstotte.
+    ``grid_after`` is the grid rent after subsidy (gridRent.totalAmount) and
+    ``compensation`` the subsidy applied against it (the sign is ignored).
+    """
+    if scheme == "norgespris":
+        if None in (energy_gross, grid_after, compensation, norgespris):
+            return None
+        return (
+            float(energy_gross)
+            + float(grid_after)
+            + subsidy_applied(compensation)
+            - float(norgespris)
+        )
+    if scheme == "subsidy":
+        return add_amounts(energy_gross, grid_after)
+    return None
+
+
+def price_per_kwh(cost: Any, kwh: Any) -> float | None:
+    """Average price per kWh (None without a cost or with no consumption)."""
+    if cost is None or kwh is None:
+        return None
+    try:
+        if float(kwh) <= 0:
+            return None
+        return float(cost) / float(kwh)
+    except (TypeError, ValueError):
+        return None
+
+
+MAX_PERIOD_DAYS = 100
+
+
+def _period_edge(value: Any, tz: dt.tzinfo) -> tuple[dt.datetime, bool]:
+    """One end of a period as an aware datetime, and whether it was a plain date."""
+    if isinstance(value, dt.datetime):
+        return (value if value.tzinfo else value.replace(tzinfo=tz)), False
+    if isinstance(value, dt.date):
+        return dt.datetime.combine(value, dt.time.min, tzinfo=tz), True
+    if isinstance(value, str):
+        text = value.strip()
+        try:
+            if len(text) == 10:
+                return dt.datetime.combine(dt.date.fromisoformat(text), dt.time.min, tzinfo=tz), True
+            parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError as err:
+            raise ValueError(f"Cannot read '{value}' as a date or time (use 2026-09-01)") from err
+        return (parsed if parsed.tzinfo else parsed.replace(tzinfo=tz)), False
+    raise ValueError(f"Cannot read {value!r} as a date or time")
+
+
+def resolve_period(fra: Any, til: Any, tz: dt.tzinfo) -> tuple[dt.datetime, dt.datetime]:
+    """Turn the two ends of a period into UTC instants [start, end).
+
+    ``fra`` is included and ``til`` is NOT, so periods can follow each other without
+    overlap: 2026-09-01 to 2026-10-01 is all of September. Plain dates mean 00:00
+    local time on that date. A date and time (or an ISO string with a time) is
+    taken exactly. Raises ValueError for unreadable input, an end that is not after
+    the start, or a period longer than MAX_PERIOD_DAYS.
+    """
+    start, _ = _period_edge(fra, tz)
+    end, _ = _period_edge(til, tz)
+    if end <= start:
+        raise ValueError("The period must end after it starts (the end date is not included)")
+    if (end - start) > dt.timedelta(days=MAX_PERIOD_DAYS):
+        raise ValueError(f"The period can be at most {MAX_PERIOD_DAYS} days")
+    return start.astimezone(dt.timezone.utc), end.astimezone(dt.timezone.utc)
+
+
+def _r(value: Any, digits: int) -> float | None:
+    """Round a number, pass None through."""
+    return None if value is None else round(float(value), digits)
+
+
+def summarise_period(
+    energy: list[dict[str, Any]],
+    charges: dict[str, Any] | None,
+    start: dt.datetime,
+    end: dt.datetime,
+    now: dt.datetime,
+    tz: dt.tzinfo,
+) -> dict[str, Any]:
+    """Cost and consumption for one free period [start, end), for a landlord's accounts.
+
+    ``energy`` are hourly consumption buckets and ``charges`` is the answer from
+    ``async_get_charges`` for the same window. The grid rent, the fixed fee and the
+    energy total are the aggregates Amperium gives for the window; the Norgespris
+    compensation can only be summed from the hourly buckets. Amounts in kr, energy
+    in kWh. ``warnings`` lists anything that makes the numbers less reliable.
+    """
+    charges = charges or {}
+    warnings: list[str] = []
+    cutoff = min(end, now.replace(minute=0, second=0, microsecond=0))
+    expected = max(0, round((cutoff - start).total_seconds() / 3600))
+
+    hours = [b for b in complete_hours(energy, now) if start <= b["start"] < end]
+    kwh = sum(b["import"] for b in hours)
+    charge_hours = [
+        b for b in complete_hours(charges.get("energy") or [], now) if start <= b["start"] < end
+    ]
+    hourly_energy = sum(b["energy"] for b in charge_hours) if charge_hours else None
+    vat = sum(b["tax"] for b in charge_hours) if charge_hours else None
+    norgespris = sum(b["norgespris"] for b in charge_hours) if charge_hours else None
+
+    grid = charges.get("grid") or {}
+    grid_after = grid.get("total")
+    compensation = grid.get("compensation")
+    outer_total = charges.get("outer_total")
+    fixed = charges.get("fixed_total")
+    capacity = grid.get("capacity_amount")
+    subsidy = subsidy_applied(compensation)
+    grid_before = gross_grid_rent(grid_after, compensation)
+    if outer_total is not None and grid_after is not None:
+        energy_gross = float(outer_total) - float(grid_after)
+    else:
+        energy_gross = hourly_energy
+
+    cost_norgespris = house_cost("norgespris", energy_gross, grid_after, compensation, norgespris)
+    cost_subsidy = house_cost("subsidy", energy_gross, grid_after, compensation, norgespris)
+
+    if end > now:
+        warnings.append("period_not_over")
+    if len(hours) < expected:
+        warnings.append(f"hours_missing:{expected - len(hours)}")
+    if len(charge_hours) != len(hours):
+        warnings.append("charge_hours_differ_from_consumption_hours")
+    if not grid:
+        warnings.append("no_grid_rent_in_answer")
+    local_first = start.astimezone(tz)
+    local_last = (end - dt.timedelta(seconds=1)).astimezone(tz)
+    if (local_first.year, local_first.month) != (local_last.year, local_last.month):
+        warnings.append("period_spans_months")
+
+    return {
+        "from": local_first.isoformat(),
+        "to": end.astimezone(tz).isoformat(),
+        "hours_expected": expected,
+        "hours_with_data": len(hours),
+        "consumption_kwh": _r(kwh, 3),
+        "energy_gross": _r(energy_gross, 2),
+        "energy_gross_hourly_sum": _r(hourly_energy, 2),
+        "vat_on_energy": _r(vat, 2),
+        "grid_before_support": _r(grid_before, 2),
+        "subsidy_applied": _r(subsidy if compensation is not None else None, 2),
+        "grid_after_support": _r(grid_after, 2),
+        "capacity_charge": _r(capacity, 2),
+        "capacity_basis_kw": _r(grid.get("capacity_avg_kw"), 3),
+        "grid_before_support_excl_capacity": _r(
+            None if grid_before is None or capacity is None else grid_before - float(capacity), 2
+        ),
+        "fixed_fee": _r(fixed, 2),
+        "norgespris_compensation": _r(norgespris, 2),
+        "house_cost_norgespris": _r(cost_norgespris, 2),
+        "house_cost_subsidy": _r(cost_subsidy, 2),
+        "price_per_kwh_norgespris": _r(price_per_kwh(cost_norgespris, kwh), 4),
+        "price_per_kwh_subsidy": _r(price_per_kwh(cost_subsidy, kwh), 4),
+        "price_per_kwh_norgespris_incl_fixed": _r(
+            price_per_kwh(None if cost_norgespris is None or fixed is None else cost_norgespris + float(fixed), kwh),
+            4,
+        ),
+        "warnings": warnings,
+    }
 
 
 def compensation_difference(norgespris: Any, subsidy: Any) -> float | None:

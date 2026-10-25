@@ -215,6 +215,27 @@
       },
       "amperium_live_power": {
         "name": "Power now (Amperium live)"
+      },
+      "grid_gross_last_month": {
+        "name": "Grid rent before subsidy last month (incl. capacity charge, excl. fixed fee)"
+      },
+      "subsidy_applied_last_month": {
+        "name": "Subsidy deducted from grid rent last month"
+      },
+      "fixed_last_month": {
+        "name": "Fixed fee last month"
+      },
+      "norgespris_last_month": {
+        "name": "Norgespris compensation last month"
+      },
+      "net_cost_last_month": {
+        "name": "Net cost last month (your scheme, incl. fixed fee)"
+      },
+      "avg_price_last_month": {
+        "name": "Average price last month (your scheme, excl. fixed fee)"
+      },
+      "avg_price_month": {
+        "name": "Average price this month (your scheme, excl. fixed fee)"
       }
     },
     "binary_sensor": {
@@ -257,6 +278,26 @@
     "login_expiring": {
       "title": "Amperium login expires soon",
       "description": "Your Amperium login expires in about {days} days. Log in again with a one-time code before then: open the reconfigure/re-login prompt on the integration under Settings → Devices & services → Amperium."
+    }
+  },
+  "services": {
+    "hent_periode": {
+      "name": "Get period",
+      "description": "Cost and consumption for a free period: energy, grid rent before and after subsidy, fixed fee, Norgespris compensation and the average price per kWh. Dates count in local time, and the end date is NOT included (2026-09-01 to 2026-10-01 is all of September). The answer is returned as response data. Amperium does not say how the fixed fee and the capacity charge are shared in a period that is not a whole month; the answer lists them separately and warns when the period spans a month end.",
+      "fields": {
+        "fra": {
+          "name": "From",
+          "description": "First day of the period, included (00:00 local time). A date and time is taken exactly."
+        },
+        "til": {
+          "name": "To",
+          "description": "The day the period ends: this day is NOT included (00:00 local time). A date and time is taken exactly."
+        },
+        "entry_id": {
+          "name": "Entry",
+          "description": "Which Amperium entry to use. Only needed with more than one."
+        }
+      }
     }
   }
 }

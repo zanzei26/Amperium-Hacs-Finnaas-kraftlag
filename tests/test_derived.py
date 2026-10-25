@@ -7,7 +7,7 @@ import datetime as dt
 import pytest
 from zoneinfo import ZoneInfo
 
-from conftest import amqp_feed, api, const, derived, hourpower
+from conftest import amqp_feed, api, const, derived, hourpower, period
 
 UTC = dt.timezone.utc
 COMP = 154.12478544  # October figures from a live account (3 days)
@@ -1243,3 +1243,250 @@ def test_a_price_of_zero_or_negative_is_a_price():
     assert derived.current_spot_price(0.0, None, 1.0) == (0.0, True)
     assert derived.current_spot_price(None, {"spot": 0.0, "official": False}, 1.0) == (0.0, False)
     assert derived.current_spot_price(None, {"spot": -0.05, "official": True}, 1.0) == (-0.05, True)
+
+
+# --- last month, free periods and the landlord's average price (October 2026) -----------------
+def _hourly(start, count, *, kwh=1.0, energy=1.0, tax=0.2, norgespris=0.5):
+    """Hourly buckets carrying both the consumption and the charges fields."""
+    out = []
+    for i in range(count):
+        first = start + dt.timedelta(hours=i)
+        out.append({"start": first, "end": first + dt.timedelta(hours=1), "import": kwh,
+                    "export": 0.0, "energy": energy, "tax": tax, "norgespris": norgespris})
+    return out
+
+
+PERIOD_NOW = dt.datetime(2026, 10, 25, 12, 0, tzinfo=UTC)
+
+
+def test_charges_summary_has_last_months_hourly_sums_split_at_local_midnight():
+    # 23:00 local on 30 September (21:00 UTC) is September; 00:00 local on 1 October is October.
+    sept = {"start": dt.datetime(2026, 9, 30, 21, tzinfo=UTC), "end": dt.datetime(2026, 9, 30, 22, tzinfo=UTC),
+            "energy": 10.0, "tax": 2.0, "norgespris": 6.0}
+    octo = {"start": dt.datetime(2026, 9, 30, 22, tzinfo=UTC), "end": dt.datetime(2026, 9, 30, 23, tzinfo=UTC),
+            "energy": 1.0, "tax": 0.2, "norgespris": 0.6}
+    out = derived.summarise_charges([sept, octo], PERIOD_NOW, OSLO)
+    assert (out["energy_gross_last_month"], out["vat_last_month"], out["norgespris_last_month"]) == (10.0, 2.0, 6.0)
+    assert (out["energy_gross_month"], out["vat_month"], out["norgespris_month"]) == (1.0, 0.2, 0.6)
+
+
+def test_charges_summary_without_last_month_hours_has_no_last_month_keys():
+    octo = {"start": dt.datetime(2026, 10, 1, 8, tzinfo=UTC), "end": dt.datetime(2026, 10, 1, 9, tzinfo=UTC),
+            "energy": 1.0, "tax": 0.2, "norgespris": 0.6}
+    out = derived.summarise_charges([octo], PERIOD_NOW, OSLO)
+    assert "norgespris_last_month" not in out and "energy_gross_last_month" not in out
+
+
+# The September figures from the invoice (Kraft 4029, Nettleie 1655, Norgespris -2820, 2156.6 kWh, 1.3280).
+# The subsidy deducted in the grid rent (1794.97) is DERIVED from 1655 - (-139.97); it is not read from the API.
+# Whether the invoice's 1655 includes the fixed fee is not known yet, so these are test inputs, not facts.
+SEPT = dict(energy=4028.93, grid_after=-139.97, compensation=1794.97, norgespris=2820.0, kwh=2156.64)
+
+
+def test_house_cost_and_price_reproduce_the_september_invoice():
+    cost = derived.house_cost("norgespris", SEPT["energy"], SEPT["grid_after"], SEPT["compensation"], SEPT["norgespris"])
+    assert cost == pytest.approx(2863.93)                      # invoice: 2864
+    assert derived.price_per_kwh(cost, SEPT["kwh"]) == pytest.approx(1.3280, abs=5e-5)
+
+
+def test_house_cost_is_sign_independent_for_the_subsidy():
+    pos = derived.house_cost("norgespris", 100.0, 10.0, 30.0, 50.0)
+    neg = derived.house_cost("norgespris", 100.0, 10.0, -30.0, 50.0)
+    assert pos == neg == pytest.approx(100.0 + 10.0 + 30.0 - 50.0)
+
+
+def test_house_cost_for_the_regular_subsidy_ignores_norgespris():
+    assert derived.house_cost("subsidy", 100.0, -20.0, 40.0, None) == pytest.approx(80.0)
+
+
+@pytest.mark.parametrize("scheme,args", [
+    (None, (1, 1, 1, 1)), ("other", (1, 1, 1, 1)),
+    ("norgespris", (1, 1, 1, None)), ("norgespris", (None, 1, 1, 1)), ("norgespris", (1, 1, None, 1)),
+    ("subsidy", (None, 1, 1, 1)),
+])
+def test_house_cost_is_unknown_when_something_is_missing(scheme, args):
+    assert derived.house_cost(scheme, *args) is None
+
+
+@pytest.mark.parametrize("cost,kwh", [(None, 10), (10, None), (10, 0), (10, -1), (10, "x"), ("x", 10)])
+def test_price_per_kwh_unknown_without_cost_or_consumption(cost, kwh):
+    assert derived.price_per_kwh(cost, kwh) is None
+
+
+def test_price_per_kwh_zero_cost_is_a_price():
+    assert derived.price_per_kwh(0.0, 10) == 0.0
+
+
+# --- resolve_period ---------------------------------------------------------------------------
+def _iso(instant):
+    return instant.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_period_end_date_is_not_included_and_dates_count_in_local_time_summer():
+    start, end = derived.resolve_period("2026-09-01", "2026-10-01", OSLO)    # all of September
+    assert (_iso(start), _iso(end)) == ("2026-08-31T22:00:00Z", "2026-09-30T22:00:00Z")
+
+
+def test_period_across_a_month_end_like_the_tenants_30_08_to_01_10():
+    start, end = derived.resolve_period("2026-08-30", "2026-10-01", OSLO)
+    assert (_iso(start), _iso(end)) == ("2026-08-29T22:00:00Z", "2026-09-30T22:00:00Z")
+    assert (end - start) == dt.timedelta(hours=32 * 24)       # 30 and 31 August + 30 days of September
+
+
+def test_period_in_winter_time():
+    start, end = derived.resolve_period("2026-12-01", "2027-01-01", OSLO)
+    assert (_iso(start), _iso(end)) == ("2026-11-30T23:00:00Z", "2026-12-31T23:00:00Z")
+
+
+@pytest.mark.parametrize("day,next_day,hours", [
+    ("2026-10-25", "2026-10-26", 25), ("2026-03-29", "2026-03-30", 23), ("2026-10-04", "2026-10-05", 24)])
+def test_one_day_period_has_the_right_number_of_hours_around_the_clock_change(day, next_day, hours):
+    start, end = derived.resolve_period(day, next_day, OSLO)
+    assert (end - start) == dt.timedelta(hours=hours)
+
+
+def test_period_with_times_is_taken_exactly_and_the_end_is_not_included():
+    start, end = derived.resolve_period("2026-09-01 06:00:00", "2026-09-02T06:00:00", OSLO)
+    assert (_iso(start), _iso(end)) == ("2026-09-01T04:00:00Z", "2026-09-02T04:00:00Z")
+    start, end = derived.resolve_period("2026-09-01T06:00:00+00:00", "2026-09-01T12:00:00Z", OSLO)
+    assert (_iso(start), _iso(end)) == ("2026-09-01T06:00:00Z", "2026-09-01T12:00:00Z")
+
+
+def test_period_accepts_date_and_datetime_objects():
+    start, end = derived.resolve_period(dt.date(2026, 9, 1), dt.date(2026, 10, 1), OSLO)
+    assert _iso(start) == "2026-08-31T22:00:00Z" and _iso(end) == "2026-09-30T22:00:00Z"
+    start, end = derived.resolve_period(dt.datetime(2026, 9, 1, 0, 0), dt.datetime(2026, 9, 2, 0, 0), OSLO)
+    assert (end - start) == dt.timedelta(hours=24)
+
+
+@pytest.mark.parametrize("fra,til", [
+    ("2026-09-30", "2026-09-01"),                 # ends before it starts
+    ("2026-09-01", "2026-09-01"),                 # the end date is not included, so this is empty
+    ("2026-09-01 12:00:00", "2026-09-01 12:00:00"),  # empty
+    ("2026-01-01", "2026-12-31"),                 # longer than 100 days
+    ("not a date", "2026-09-30"), ("2026-09-01", ""), (None, "2026-09-30"), (5, 6),
+])
+def test_period_rejects_bad_input(fra, til):
+    with pytest.raises(ValueError):
+        derived.resolve_period(fra, til, OSLO)
+
+
+# --- summarise_period ---------------------------------------------------------------------------
+def _sept_inputs():
+    start, end = derived.resolve_period("2026-09-01", "2026-10-01", OSLO)
+    hours = _hourly(start, 720, kwh=3.0, energy=5.6, tax=1.1, norgespris=2820.0 / 720)
+    charges = {
+        "energy": hours,
+        "outer_total": SEPT["energy"] + SEPT["grid_after"],
+        "grid": {"total": SEPT["grid_after"], "compensation": SEPT["compensation"],
+                 "capacity_amount": 525.0, "capacity_avg_kw": 10.39},
+        "fixed_total": 50.0,
+    }
+    return start, end, hours, charges
+
+
+def test_period_summary_for_september_matches_the_invoice_figures():
+    start, end, hours, charges = _sept_inputs()
+    out = derived.summarise_period(hours, charges, start, end, PERIOD_NOW, OSLO)
+    assert out["warnings"] == []
+    assert out["hours_expected"] == out["hours_with_data"] == 720
+    assert out["consumption_kwh"] == pytest.approx(2160.0)
+    assert out["energy_gross"] == pytest.approx(4028.93)           # from the aggregate, not the hours
+    assert out["energy_gross_hourly_sum"] == pytest.approx(4032.0)
+    assert out["grid_after_support"] == pytest.approx(-139.97)
+    assert out["subsidy_applied"] == pytest.approx(1794.97)
+    assert out["grid_before_support"] == pytest.approx(1655.0)
+    assert out["capacity_charge"] == pytest.approx(525.0)
+    assert out["grid_before_support_excl_capacity"] == pytest.approx(1130.0)
+    assert out["fixed_fee"] == pytest.approx(50.0)
+    assert out["norgespris_compensation"] == pytest.approx(2820.0)
+    assert out["house_cost_norgespris"] == pytest.approx(2863.93)
+    assert out["house_cost_subsidy"] == pytest.approx(4028.93 - 139.97)
+    assert out["price_per_kwh_norgespris"] == pytest.approx(2863.93 / 2160.0, abs=5e-5)
+    assert out["price_per_kwh_norgespris_incl_fixed"] == pytest.approx((2863.93 + 50.0) / 2160.0, abs=5e-5)
+    assert out["from"].startswith("2026-09-01T00:00:00+02:00") and out["to"].startswith("2026-10-01T00:00:00+02:00")
+
+
+def test_period_summary_warns_when_the_period_spans_a_month_end():
+    start, end = derived.resolve_period("2026-08-30", "2026-10-01", OSLO)
+    hours = _hourly(start, 32 * 24)
+    charges = {"energy": hours, "outer_total": 10.0, "grid": {"total": 1.0, "compensation": 2.0}, "fixed_total": 1.0}
+    out = derived.summarise_period(hours, charges, start, end, PERIOD_NOW, OSLO)
+    assert "period_spans_months" in out["warnings"]
+    assert out["hours_expected"] == out["hours_with_data"] == 32 * 24
+
+
+def test_period_summary_warns_for_a_period_that_is_not_over_and_counts_hours_up_to_now():
+    start, end, hours, charges = _sept_inputs()
+    now = start + dt.timedelta(days=10, minutes=30)                  # 10 days and a half hour in
+    out = derived.summarise_period(hours, charges, start, end, now, OSLO)
+    assert "period_not_over" in out["warnings"]
+    assert out["hours_expected"] == 240 and out["hours_with_data"] == 240
+    assert out["consumption_kwh"] == pytest.approx(720.0)
+
+
+def test_period_summary_warns_about_missing_hours_and_mismatched_charge_hours():
+    start, end, hours, charges = _sept_inputs()
+    out = derived.summarise_period(hours[:-3], charges, start, end, PERIOD_NOW, OSLO)
+    assert "hours_missing:3" in out["warnings"]
+    assert "charge_hours_differ_from_consumption_hours" in out["warnings"]
+
+
+def test_period_summary_without_charges_gives_consumption_and_warns():
+    start, end, hours, _ = _sept_inputs()
+    out = derived.summarise_period(hours, None, start, end, PERIOD_NOW, OSLO)
+    assert out["consumption_kwh"] == pytest.approx(2160.0)
+    assert "no_grid_rent_in_answer" in out["warnings"]
+    for key in ("energy_gross", "grid_before_support", "norgespris_compensation",
+                "house_cost_norgespris", "price_per_kwh_norgespris"):
+        assert out[key] is None
+
+
+def test_period_summary_falls_back_on_the_hourly_energy_sum_without_an_aggregate():
+    start, end, hours, charges = _sept_inputs()
+    charges["outer_total"] = None
+    out = derived.summarise_period(hours, charges, start, end, PERIOD_NOW, OSLO)
+    assert out["energy_gross"] == pytest.approx(4032.0)
+
+
+def test_period_summary_over_the_autumn_clock_change_counts_all_25_hours():
+    start, end = derived.resolve_period("2026-10-25", "2026-10-26", OSLO)
+    hours = _hourly(start, 25)
+    charges = {"energy": hours, "outer_total": 1.0, "grid": {"total": 1.0, "compensation": 0.0}, "fixed_total": 0.0}
+    out = derived.summarise_period(hours, charges, start, end, dt.datetime(2026, 10, 26, 12, tzinfo=UTC), OSLO)
+    assert out["hours_expected"] == out["hours_with_data"] == 25
+    assert out["warnings"] == []
+
+
+# --- period.async_period_summary, with a fake client -------------------------------------------
+class _PeriodClient:
+    def __init__(self, energy, charges):
+        self.energy, self.charges, self.calls = energy, charges, []
+
+    async def async_get_energy(self, site_id, start, end):
+        self.calls.append(("energy", site_id, start, end))
+        return self.energy
+
+    async def async_get_charges(self, site_id, start, end):
+        self.calls.append(("charges", site_id, start, end))
+        return self.charges
+
+
+def test_period_helper_asks_for_both_answers_for_the_same_window_and_adds_the_scheme():
+    start, end, hours, charges = _sept_inputs()
+    client = _PeriodClient(hours, charges)
+    out = asyncio.run(period.async_period_summary(client, 215, start, end, OSLO, "norgespris", now=PERIOD_NOW))
+    assert [c[0] for c in client.calls] == ["energy", "charges"]
+    assert all(c[1:] == (215, start, end) for c in client.calls)
+    assert out["scheme"] == "norgespris"
+    assert out["house_cost_norgespris"] == pytest.approx(2863.93)
+
+
+def test_period_helper_lets_amperium_errors_through():
+    class Failing(_PeriodClient):
+        async def async_get_charges(self, site_id, start, end):
+            raise api.AmperiumError("HTTP 500")
+
+    start, end, hours, charges = _sept_inputs()
+    with pytest.raises(api.AmperiumError):
+        asyncio.run(period.async_period_summary(Failing(hours, charges), 215, start, end, OSLO))
