@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import datetime as dt
+import hashlib
 import importlib
 import json
 import logging
@@ -27,6 +28,7 @@ from typing import Any
 from .api import AmperiumClient, LiveSubscription, _parse_dt
 from .const import (
     DOMAIN,
+    LIVE_DOWN_AFTER_SECONDS,
     LIVE_FEED_TTL_SECONDS,
     LIVE_MAX_AGE_SECONDS,
     LIVE_OBS_IMPORT,
@@ -35,8 +37,12 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Waits between attempts after a failure; the last one repeats.
-BACKOFF_SECONDS = (5, 15, 30, 60, 120, 300)
+# Waits between attempts after a failure; the last one repeats. A new subscription is asked
+# for before every attempt (never reused), so a long wait only spares Amperium while it is down.
+BACKOFF_SECONDS = (5, 15, 30, 60, 120, 300, 600)
+# A stream that ends or goes quiet is not an error (the meter may just be silent). The wait
+# after that never grows past this, so live power is back within 5 minutes of the meter.
+QUIET_BACKOFF_CAP_SECONDS = 300
 # Subscribe again when nothing has arrived for this long (the queue may have expired).
 # The meter sends about every 2 s, so a minute of silence means the feed has stopped.
 IDLE_RESUBSCRIBE_SECONDS = 60
@@ -50,6 +56,9 @@ RENEW_PAUSE_SECONDS = 1
 TICK_SECONDS = 30
 # How often the listening checks whether it is time to renew or the feed went quiet.
 CHECK_SECONDS = 10
+
+# Every value LiveFeedState.status can have.
+LIVE_STATUSES = ("off", "starting", "connecting", "connected", "error", "unavailable")
 
 Listener = Callable[[], None]
 
@@ -99,6 +108,9 @@ class LiveFeedState:
         self.import_observed: dt.datetime | None = None
         self.last_error: str | None = None  # the current problem; None while it works
         self.last_error_at: dt.datetime | None = None  # when the latest error happened
+        self.failures = 0  # attempts in a row that failed (0 while it works)
+        self.started_at: dt.datetime | None = None  # when the feed was started
+        self.last_message_at: dt.datetime | None = None  # when the latest reading arrived
         self._fresh_at: dt.datetime | None = None
         self._listeners: list[Listener] = []
 
@@ -148,6 +160,25 @@ class LiveFeedState:
             return None
         return self.import_kw
 
+    def silent_seconds(self, now: dt.datetime) -> float | None:
+        """Seconds since the latest reading arrived (since the start if none has).
+
+        None before the feed has been started.
+        """
+        since = self.last_message_at or self.started_at
+        if since is None:
+            return None
+        return max(0.0, (now - since).total_seconds())
+
+    def is_down(self, now: dt.datetime, limit: float = LIVE_DOWN_AFTER_SECONDS) -> bool:
+        """True when nothing has arrived for longer than ``limit`` seconds.
+
+        It does not matter why: the stream may be failing, or it may be up while the
+        meter sends nothing. Either way there is no live power to show.
+        """
+        silent = self.silent_seconds(now)
+        return silent is not None and silent > limit
+
 
 def _safe_error(err: BaseException, secrets: list[Any]) -> str:
     """An error text that cannot contain credentials, hosts or queue names."""
@@ -161,6 +192,18 @@ def _safe_error(err: BaseException, secrets: list[Any]) -> str:
 
 
 ConsumeFn = Callable[[dict[str, Any], Callable[[str, bytes], None]], Awaitable[None]]
+
+_SAME_DETAILS = " (same connection details as the attempt before)"
+RECONNECT_REQUESTED = "reconnect requested"
+
+
+def _fingerprint(details: dict[str, Any]) -> str:
+    """A hash of who and where the subscription logs in, to tell if two answers are identical.
+
+    Only compared with another hash; it is never logged or shown.
+    """
+    text = "|".join(str(details.get(key)) for key in ("server", "username", "queueName"))
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 class AmperiumLiveFeed:
@@ -185,6 +228,13 @@ class AmperiumLiveFeed:
         self._sleep = sleep
         self._last_message = time.monotonic()
         self._first_message_logged = False
+        self._wake = asyncio.Event()  # set by request_reconnect()
+        self._failures = 0
+        # The problem the log last told about (None while the feed works); a repeat of it
+        # is not logged again, so an outage of hours is one warning and one "working again".
+        self._problem_logged: str | None = None
+        self._problem_since: float | None = None
+        self._failed_fingerprint: str | None = None
 
     @staticmethod
     def _now() -> dt.datetime:
@@ -201,8 +251,16 @@ class AmperiumLiveFeed:
             return
         self._last_message = time.monotonic()
         self.state.messages += 1
+        self.state.last_message_at = self._now()
+        self.state.failures = 0
+        self._failed_fingerprint = None
         if self.state.last_error is not None:
             self.state.last_error = None  # readings arrive again, so the problem is over
+        if self._problem_logged is not None:
+            minutes = (time.monotonic() - (self._problem_since or time.monotonic())) / 60
+            _LOGGER.info("Amperium live feed: working again after %.0f min", minutes)
+            self._problem_logged = None
+            self._problem_since = None
         if not self._first_message_logged:
             self._first_message_logged = True
             _LOGGER.info("Amperium live feed: first power reading received")
@@ -213,27 +271,82 @@ class AmperiumLiveFeed:
         if subscription.import_observations:
             observed, watts = subscription.import_observations[-1]
             self.state.set_import(watts / 1000.0, observed, observed)
+            if self.state.last_message_at is None or observed > self.state.last_message_at:
+                self.state.last_message_at = observed
+
+    def request_reconnect(self) -> bool:
+        """Drop the stream and subscribe again now, without waiting out a backoff.
+
+        Returns False when the feed is not running (it was never started, or the
+        library could not be installed), which a reconnect cannot fix.
+        """
+        if self.state.status in ("off", "unavailable"):
+            return False
+        self._failures = 0
+        self.state.failures = 0
+        self._wake.set()
+        return True
+
+    def _report_problem(self, text: str, *, hard: bool, delay: float) -> None:
+        """Log a problem once. The same problem again is only logged at DEBUG.
+
+        ``hard`` is an error (a warning); a stream that just ended or went quiet is not.
+        """
+        if text == self._problem_logged:
+            _LOGGER.debug("Amperium live feed: %s (trying again in %s s)", text, delay)
+            return
+        self._problem_logged = text
+        if self._problem_since is None:
+            self._problem_since = time.monotonic()
+        _LOGGER.log(
+            logging.WARNING if hard else logging.INFO,
+            "Amperium live feed: %s (trying again in %s s; the same problem is not logged "
+            "again until it changes or goes away)",
+            text,
+            delay,
+        )
+
+    async def _pause(self, seconds: float) -> None:
+        """Wait ``seconds``, or less if a reconnect is requested meanwhile."""
+        if self._wake.is_set():
+            return
+        sleeper = asyncio.ensure_future(self._sleep(seconds))
+        waker = asyncio.ensure_future(self._wake.wait())
+        try:
+            await asyncio.wait({sleeper, waker}, return_when=asyncio.FIRST_COMPLETED)
+            if sleeper.done():
+                sleeper.result()  # lets a cancellation or an error from the wait through
+        finally:
+            for task in (sleeper, waker):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(sleeper, waker, return_exceptions=True)
 
     async def run(self) -> None:
         """Run until cancelled: subscribe, listen, and start over after any failure."""
         state = self.state
+        state.started_at = self._now()
         state.set_status("starting")
         if not await self._ensure_library():
             state.set_status("unavailable")
             return
         ticker = asyncio.create_task(self._tick())
-        failures = 0
         try:
             while True:
                 secrets: list[Any] = []
+                fingerprint: str | None = None
+                problem: tuple[str, bool] | None = None  # (text, is it an error)
                 started = time.monotonic()
                 messages_before = state.messages
+                self._wake.clear()
                 try:
                     state.set_status("connecting")
+                    # Always a new subscription: the details of an earlier one may have expired.
                     subscription = await self._client.async_create_live_subscription(
                         self._site_id, ttl_seconds=LIVE_FEED_TTL_SECONDS
                     )
                     secrets = list(subscription.details.values())
+                    fingerprint = _fingerprint(subscription.details)
                     self._take_history(subscription)
                     self._first_message_logged = False
                     self._last_message = time.monotonic()
@@ -241,29 +354,38 @@ class AmperiumLiveFeed:
                     reason = await self._listen(subscription.details)
                     if reason == "renew":
                         _LOGGER.debug("Amperium live feed: renewing the subscription")
-                        failures = 0
-                        await self._sleep(RENEW_PAUSE_SECONDS)
+                        self._failures = 0
+                        await self._pause(RENEW_PAUSE_SECONDS)
                         continue
-                    _LOGGER.info("Amperium live feed: %s, subscribing again", reason)
+                    if reason == RECONNECT_REQUESTED:
+                        _LOGGER.info("Amperium live feed: reconnecting on request")
+                        self._failures = 0
+                        continue
+                    problem = (reason, False)
                 except asyncio.CancelledError:
                     raise
                 except Exception as err:  # noqa: BLE001 - any failure means "try again later"
-                    state.last_error = _safe_error(err, secrets)
+                    text = _safe_error(err, secrets)
+                    if fingerprint is not None and fingerprint == self._failed_fingerprint:
+                        text += _SAME_DETAILS
+                    if fingerprint is not None:
+                        self._failed_fingerprint = fingerprint
+                    state.last_error = text
                     state.last_error_at = self._now()
                     state.set_status("error")
-                    # One failure is often just the network not being ready yet.
-                    _LOGGER.log(
-                        logging.WARNING if failures else logging.INFO,
-                        "Amperium live feed: %s (trying again)",
-                        state.last_error,
-                    )
+                    problem = (text, True)
                 if state.messages > messages_before and time.monotonic() - started > 60:
-                    failures = 0  # it worked for a while; start again from the short wait
+                    self._failures = 0  # it worked for a while; start again from the short wait
                     delay = BACKOFF_SECONDS[0]
                 else:
-                    delay = BACKOFF_SECONDS[min(failures, len(BACKOFF_SECONDS) - 1)]
-                    failures += 1
-                await self._sleep(delay)
+                    delay = BACKOFF_SECONDS[min(self._failures, len(BACKOFF_SECONDS) - 1)]
+                    self._failures += 1
+                state.failures = self._failures
+                if problem is not None and not problem[1]:
+                    delay = min(delay, QUIET_BACKOFF_CAP_SECONDS)
+                if problem is not None:
+                    self._report_problem(problem[0], hard=problem[1], delay=delay)
+                await self._pause(delay)
         finally:
             ticker.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -273,17 +395,21 @@ class AmperiumLiveFeed:
     async def _listen(self, details: dict[str, Any]) -> str:
         """Consume the queue; say why it stopped.
 
-        Returns "renew" (time for a new subscription), "nothing received for N s"
-        (the feed went quiet) or "connection ended". Errors are raised.
+        Returns "renew" (time for a new subscription), "reconnect requested",
+        "nothing received for N s" (the feed went quiet) or "connection ended".
+        Errors are raised.
         """
         task = asyncio.ensure_future(self._consume(details, self.handle_message))
+        waker = asyncio.ensure_future(self._wake.wait())
         started = time.monotonic()
         check = min(CHECK_SECONDS, IDLE_RESUBSCRIBE_SECONDS, RENEW_AFTER_SECONDS)
         try:
             while not task.done():
-                await asyncio.wait({task}, timeout=check)
+                await asyncio.wait({task, waker}, timeout=check, return_when=asyncio.FIRST_COMPLETED)
                 if task.done():
                     break
+                if self._wake.is_set():
+                    return RECONNECT_REQUESTED
                 now = time.monotonic()
                 if now - started >= RENEW_AFTER_SECONDS:
                     return "renew"
@@ -292,10 +418,13 @@ class AmperiumLiveFeed:
             task.result()
             return "connection ended"
         finally:
+            waker.cancel()
             if not task.done():
                 task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await task
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await waker
 
     async def _tick(self) -> None:
         """Wake the listeners now and then so an old reading is shown as gone."""

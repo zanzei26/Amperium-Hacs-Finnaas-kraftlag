@@ -15,3 +15,11 @@ hent_periode:
       selector:
         config_entry:
           integration: amperium
+
+koble_til_live:
+  fields:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: amperium

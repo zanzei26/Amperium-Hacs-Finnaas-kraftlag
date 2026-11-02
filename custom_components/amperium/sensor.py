@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import functools
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -15,6 +16,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import EntityCategory, UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -22,6 +24,7 @@ from homeassistant.util import dt as dt_util
 
 from . import AmperiumConfigEntry
 from .amqp_feed import (
+    LIVE_STATUSES,
     AmperiumLiveFeed,
     LiveFeedState,
     async_prepare_library,
@@ -56,6 +59,8 @@ from .derived import (
     vat_with_fixed_price,
 )
 from .live import LivePowerTracker
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -558,6 +563,21 @@ SENSORS: tuple[AmperiumSensorDescription, ...] = (
         value_fn=lambda d: han_signal_state(d.get("han_signal"), d.get("han_online")),
     ),
     AmperiumSensorDescription(
+        key="han_last_data",
+        translation_key="han_last_data",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:clock-check-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: dt_util.parse_datetime(d.get("updated") or ""),
+    ),
+    AmperiumSensorDescription(
+        key="hours_missing_month",
+        translation_key="hours_missing_month",
+        icon="mdi:clock-alert-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.get("hours_missing_month"),
+    ),
+    AmperiumSensorDescription(
         key="spot_price_incl_vat",
         translation_key="spot_price_incl_vat",
         native_unit_of_measurement="kr/kWh",
@@ -652,19 +672,37 @@ async def async_setup_entry(
             consume=functools.partial(consume_with_aio_pika, ssl_context=ssl_context),
             ensure_library=lambda: async_prepare_library(hass),
         )
+        coordinator.live_feed = feed  # the service amperium.koble_til_live restarts it
         entry.async_create_background_task(hass, feed.run(), "amperium_live_feed")
 
+    # "Login valid until" is the refresh token's expiry, which Amperium does not always
+    # send. Without a date the sensor would be unknown for ever, so it is not created (and
+    # an older one is removed). It comes back at the next start if a date turns up.
+    has_login_date = (coordinator.data or {}).get("login_valid_until") is not None
+    if not has_login_date:
+        _remove_entity(hass, entry, "login_valid_until")
     entities: list[SensorEntity] = [
         AmperiumSensor(coordinator, entry, description, tracker, live_state)
         for description in SENSORS
+        if description.key != "login_valid_until" or has_login_date
     ]
     if tracker is not None:
         entities.append(AmperiumLivePowerSensor(tracker, entry, "live_power"))
         entities.append(AmperiumLivePowerSensor(tracker, entry, "hour_power_forecast"))
     if live_state is not None:
         entities.append(AmperiumLiveFeedSensor(live_state, entry))
+        entities.append(AmperiumLiveStatusSensor(live_state, entry))
 
     async_add_entities(entities)
+
+
+def _remove_entity(hass: HomeAssistant, entry: AmperiumConfigEntry, key: str) -> None:
+    """Remove a sensor of ours from the entity registry, if an older version created it."""
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{key}")
+    if entity_id is not None:
+        registry.async_remove(entity_id)
+        _LOGGER.info("Amperium: removed %s, it has no data to show", entity_id)
 
 
 class AmperiumSensor(CoordinatorEntity[AmperiumCoordinator], SensorEntity):
@@ -684,6 +722,7 @@ class AmperiumSensor(CoordinatorEntity[AmperiumCoordinator], SensorEntity):
             "local_entity",
             "amperium_kw",
             "live_status",
+            "hours",
         }
     )
 
@@ -791,6 +830,8 @@ class AmperiumSensor(CoordinatorEntity[AmperiumCoordinator], SensorEntity):
             return None
         if key == "energy_month":
             return {"updated": data.get("updated")}
+        if key == "hours_missing_month":
+            return {"hours": data.get("hours_missing_list", [])}
         if key == "energy_last_hour":
             return {"consumption_today": data.get("consumption_today", [])}
         if key == "spot_price":
@@ -916,8 +957,10 @@ class AmperiumLivePowerSensor(SensorEntity):
 class AmperiumLiveFeedSensor(SensorEntity):
     """Power now straight from Amperium's live feed (only with the option switched on).
 
-    Empty when no reading has arrived in the last two minutes. The attributes say
-    how the feed is doing, which makes it easy to see whether the meter delivers.
+    Unknown when no reading has arrived in the last two minutes, and unavailable once
+    nothing has arrived for 15 minutes (a monitoring rule can look for that). Home
+    Assistant hides the attributes of an unavailable sensor, so the same information
+    is also on "Amperium live status", which is always available.
     """
 
     _attr_has_entity_name = True
@@ -928,7 +971,10 @@ class AmperiumLiveFeedSensor(SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 2
     _unrecorded_attributes = frozenset(
-        {"status", "messages", "age_seconds", "observed_at", "last_error", "last_error_at"}
+        {
+            "status", "messages", "age_seconds", "observed_at", "last_error", "last_error_at",
+            "siste_melding", "feil",
+        }
     )
 
     def __init__(self, state: LiveFeedState, entry: AmperiumConfigEntry) -> None:
@@ -953,6 +999,11 @@ class AmperiumLiveFeedSensor(SensorEntity):
         self.async_write_ha_state()
 
     @property
+    def available(self) -> bool:
+        """Not available when nothing has arrived for LIVE_DOWN_AFTER_SECONDS."""
+        return not self._state.is_down(dt_util.utcnow())
+
+    @property
     def native_value(self) -> float | None:
         """Return the live power in kW, or None without a recent reading."""
         value = self._state.current_kw(dt_util.utcnow())
@@ -961,15 +1012,92 @@ class AmperiumLiveFeedSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Say how the feed is doing."""
-        age = self._state.age_seconds(dt_util.utcnow())
-        observed = self._state.import_observed
+        return _live_attributes(self._state)
+
+
+def _live_attributes(state: LiveFeedState) -> dict[str, Any]:
+    """What the live feed knows about itself; ``siste_melding`` and ``feil`` are the short ones."""
+    age = state.age_seconds(dt_util.utcnow())
+    observed = state.import_observed
+    last_message = state.last_message_at
+    return {
+        "status": state.status,
+        "messages": state.messages,
+        "age_seconds": None if age is None else round(age),
+        "observed_at": observed.isoformat() if observed else None,
+        "last_error": state.last_error,
+        "last_error_at": state.last_error_at.isoformat() if state.last_error_at else None,
+        # When the latest reading arrived here, and the problem that is going on (None if none).
+        "siste_melding": last_message.isoformat() if last_message else None,
+        "feil": state.last_error,
+    }
+
+
+class AmperiumLiveStatusSensor(SensorEntity):
+    """How the live feed is doing, as a state that is always available.
+
+    The live power sensor becomes unavailable when the feed is down, and then Home Assistant
+    shows none of its attributes. This one keeps saying what is wrong (``feil``) and when
+    the last reading arrived (``siste_melding``). It is written when something changes, and
+    otherwise at most once a minute, not for every reading.
+    """
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "amperium_live_status"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(LIVE_STATUSES)
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _unrecorded_attributes = frozenset(
+        {"status", "messages", "age_seconds", "observed_at", "last_error", "last_error_at",
+         "siste_melding", "feil", "failures", "down"}
+    )
+
+    def __init__(self, state: LiveFeedState, entry: AmperiumConfigEntry) -> None:
+        """Initialise the sensor."""
+        self._state = state
+        self._gate = ChangeGate()
+        site_id = entry.data[CONF_SITE_ID]
+        site_name = entry.data.get(CONF_SITE_NAME) or f"Site {site_id}"
+        self._attr_unique_id = f"{entry.entry_id}_amperium_live_status"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, str(site_id))},
+            name=f"Amperium {site_name}",
+            manufacturer="Amperium",
+            model="HAN / kraftlag",
+        )
+
+    def _signature(self) -> tuple[Any, ...]:
+        state = self._state
+        last = state.last_message_at
+        return (
+            state.status,
+            state.last_error,
+            state.failures,
+            state.is_down(dt_util.utcnow()),
+            int(last.timestamp() // 60) if last else None,
+        )
+
+    async def async_added_to_hass(self) -> None:
+        """Follow the feed, but write only when the picture changes."""
+        self._gate.changed(self._signature())
+        self.async_on_remove(self._state.add_listener(self._handle_update))
+
+    @callback
+    def _handle_update(self) -> None:
+        if self._gate.changed(self._signature()):
+            self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> str:
+        """The feed's status: off, starting, connecting, connected, error or unavailable."""
+        return self._state.status
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """The same attributes as the live power sensor, plus the failure count."""
         return {
-            "status": self._state.status,
-            "messages": self._state.messages,
-            "age_seconds": None if age is None else round(age),
-            "observed_at": observed.isoformat() if observed else None,
-            "last_error": self._state.last_error,
-            "last_error_at": (
-                self._state.last_error_at.isoformat() if self._state.last_error_at else None
-            ),
+            **_live_attributes(self._state),
+            "failures": self._state.failures,
+            "down": self._state.is_down(dt_util.utcnow()),
         }

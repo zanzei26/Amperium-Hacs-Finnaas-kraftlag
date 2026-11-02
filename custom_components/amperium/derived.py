@@ -34,6 +34,43 @@ def complete_hours(buckets: list[dict[str, Any]], now: dt.datetime) -> list[dict
     return [seen[k] for k in sorted(seen)]
 
 
+def missing_hours(
+    buckets: list[dict[str, Any]],
+    start: dt.datetime,
+    now: dt.datetime,
+    grace_hours: int = 2,
+) -> list[dt.datetime]:
+    """Whole hours with no data inside the series, oldest first.
+
+    Counted from the first hour that has data (not before ``start``) up to ``grace_hours``
+    before ``now``: Amperium publishes an hour a few minutes after it ends, and a module
+    that has just gone offline delivers late, so the newest hours are not missing yet.
+    Nothing is invented for a missing hour; this only says which ones are not there.
+    """
+    present = {b["start"] for b in complete_hours(buckets, now) if b["start"] >= start}
+    if not present:
+        return []
+    cutoff = now.replace(minute=0, second=0, microsecond=0) - dt.timedelta(hours=grace_hours)
+    out: list[dt.datetime] = []
+    hour = min(present)
+    while hour < cutoff:
+        if hour not in present:
+            out.append(hour)
+        hour += dt.timedelta(hours=1)
+    return out
+
+
+def changed_hours(
+    previous: set[dt.datetime] | None, current: set[dt.datetime]
+) -> tuple[list[dt.datetime], list[dt.datetime]]:
+    """(hours that have become missing, hours that were missing and have been filled in).
+
+    ``previous`` None means this is the first look: everything missing counts as new.
+    """
+    before = previous or set()
+    return sorted(current - before), sorted(before - current)
+
+
 def choose_power_now(
     local_kw: float | None,
     amperium_kw: float | None,

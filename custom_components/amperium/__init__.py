@@ -1,6 +1,8 @@
 """The Amperium integration."""
 from __future__ import annotations
 
+from datetime import timedelta
+
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
@@ -8,10 +10,11 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .api import AmperiumAuthError, AmperiumError
-from .const import CONF_SCHEME, CONF_SITE_ID, DOMAIN
+from .const import CONF_SCHEME, CONF_SITE_ID, DOMAIN, HAN_STATUS_INTERVAL
 from .coordinator import AmperiumCoordinator
 from .derived import resolve_period
 from .period import async_period_summary
@@ -28,10 +31,13 @@ SERVICE_PERIOD_SCHEMA = vol.Schema(
         vol.Optional("entry_id"): cv.string,
     }
 )
+SERVICE_LIVE = "koble_til_live"
+SERVICE_LIVE_SCHEMA = vol.Schema({vol.Optional("entry_id"): cv.string})
+SERVICES = (SERVICE_PERIOD, SERVICE_LIVE)
 
 
-async def _async_handle_period(call: ServiceCall) -> ServiceResponse:
-    """Cost and consumption for a free period, as response data."""
+def _selected_entry(call: ServiceCall) -> ConfigEntry:
+    """The loaded Amperium entry a service call is for (the only one, or the one named)."""
     hass = call.hass
     entries = [
         entry
@@ -45,7 +51,26 @@ async def _async_handle_period(call: ServiceCall) -> ServiceResponse:
         raise ServiceValidationError("Ingen Amperium-oppføring er lastet")
     if len(entries) > 1:
         raise ServiceValidationError("Flere Amperium-oppføringer: velg en med entry_id")
-    entry = entries[0]
+    return entries[0]
+
+
+async def _async_handle_live(call: ServiceCall) -> None:
+    """Drop the live stream and subscribe again now, with the waiting between tries reset."""
+    feed = _selected_entry(call).runtime_data.live_feed
+    if feed is None:
+        raise ServiceValidationError(
+            "Live-strømmen er ikke slått på (velg «Jeg har en Dobbe-modul» under Konfigurer)"
+        )
+    if not feed.request_reconnect():
+        raise HomeAssistantError(
+            "Live-strømmen kjører ikke (biblioteket aio-pika mangler?). Se loggen og last "
+            "integrasjonen på nytt"
+        )
+
+
+async def _async_handle_period(call: ServiceCall) -> ServiceResponse:
+    """Cost and consumption for a free period, as response data."""
+    entry = _selected_entry(call)
     tz = dt_util.DEFAULT_TIME_ZONE
     try:
         start, end = resolve_period(call.data["fra"], call.data["til"], tz)
@@ -76,6 +101,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmperiumConfigEntry) -> 
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+    # The HAN module's status is read more often than the main poll, so a short outage shows.
+    entry.async_on_unload(
+        async_track_time_interval(
+            hass,
+            coordinator.async_refresh_han_status,
+            timedelta(seconds=HAN_STATUS_INTERVAL),
+        )
+    )
     if not hass.services.has_service(DOMAIN, SERVICE_PERIOD):
         hass.services.async_register(
             DOMAIN,
@@ -83,6 +116,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmperiumConfigEntry) -> 
             _async_handle_period,
             schema=SERVICE_PERIOD_SCHEMA,
             supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_LIVE):
+        hass.services.async_register(
+            DOMAIN, SERVICE_LIVE, _async_handle_live, schema=SERVICE_LIVE_SCHEMA
         )
     return True
 
@@ -98,7 +135,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: AmperiumConfigEntry) ->
             if other.entry_id != entry.entry_id and other.state is ConfigEntryState.LOADED
         ]
         if not others:
-            hass.services.async_remove(DOMAIN, SERVICE_PERIOD)
+            for service in SERVICES:
+                hass.services.async_remove(DOMAIN, service)
     return unload_ok
 
 

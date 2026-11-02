@@ -236,6 +236,23 @@
       },
       "avg_price_month": {
         "name": "Snittpris denne måneden (din ordning, inkl. fast månedspris)"
+      },
+      "amperium_live_status": {
+        "name": "Amperium live status",
+        "state": {
+          "off": "Av",
+          "starting": "Starter",
+          "connecting": "Kobler til",
+          "connected": "Tilkoblet",
+          "error": "Feil",
+          "unavailable": "Utilgjengelig"
+        }
+      },
+      "han_last_data": {
+        "name": "HAN siste data"
+      },
+      "hours_missing_month": {
+        "name": "Manglende timer denne måneden"
       }
     },
     "binary_sensor": {
@@ -293,6 +310,16 @@
           "name": "Til",
           "description": "Dagen perioden slutter: denne dagen er IKKE med (kl. 00:00 lokal tid). Dato og klokkeslett tas nøyaktig."
         },
+        "entry_id": {
+          "name": "Oppføring",
+          "description": "Hvilken Amperium-oppføring som brukes. Trengs bare hvis du har flere."
+        }
+      }
+    },
+    "koble_til_live": {
+      "name": "Koble til live på nytt",
+      "description": "Dropper Amperiums live-strøm og abonnerer på nytt med en gang, og nullstiller ventetiden mellom forsøkene. Bruk den når «Effekt nå (Amperium live)» er utilgjengelig og du ikke vil starte Home Assistant på nytt. Har bare virkning når valget «Jeg har en Dobbe-modul» er på.",
+      "fields": {
         "entry_id": {
           "name": "Oppføring",
           "description": "Hvilken Amperium-oppføring som brukes. Trengs bare hvis du har flere."
