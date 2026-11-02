@@ -126,7 +126,8 @@ class AmperiumClient:
                 return resp.status, data
         except (aiohttp.ClientError, TimeoutError) as err:
             # A request timeout raises TimeoutError, which is no ClientError.
-            raise AmperiumError(f"Network error: {err or 'timeout'}") from err
+            # A timeout carries no text; name the kind of error instead of ending on "error: ".
+            raise AmperiumError(f"Network error: {str(err) or type(err).__name__}") from err
 
     # ------------------------------------------------------------------ #
     # Authentication
@@ -205,13 +206,19 @@ class AmperiumClient:
     # Data
     # ------------------------------------------------------------------ #
     async def _auth_get(self, path: str) -> tuple[int, Any]:
-        """Authenticated GET, refreshing the token once on 401.
+        """Authenticated GET, refreshing the token once on 401."""
+        return await self._auth_request("GET", path)
+
+    async def _auth_request(
+        self, method: str, path: str, json: dict[str, Any] | None = None
+    ) -> tuple[int, Any]:
+        """Authenticated request, refreshing the token once on 401.
 
         Refreshing is serialised: when several requests hit 401 together, the
         first one refreshes and the others just retry with the new token.
         """
         used_token = self.access_token
-        status, data = await self._request("GET", path, auth=True)
+        status, data = await self._request(method, path, json=json, auth=True)
         if status == 401:
             async with self._refresh_lock:
                 if self.access_token != used_token:
@@ -219,7 +226,7 @@ class AmperiumClient:
                 else:
                     refreshed = await self.refresh()
             if refreshed:
-                status, data = await self._request("GET", path, auth=True)
+                status, data = await self._request(method, path, json=json, auth=True)
         return status, data
 
     async def _get_sites_raw(
@@ -280,8 +287,10 @@ class AmperiumClient:
         any buffered observations since ``initializeFrom``. The values are in
         watts (the app divides by 1000 to show kW).
 
-        A 401 is not refreshed here: the regular poll refreshes the token, and
-        the live feed simply tries again later.
+        The answer always holds fresh connection details, so a caller that
+        reconnects must ask again and never reuse an earlier answer. A 401 (the
+        access token has expired) refreshes the token once and asks again, like
+        every other call; if the refresh is refused it is an auth error.
         """
         now = datetime.datetime.now(datetime.timezone.utc)
         body = {
@@ -290,8 +299,8 @@ class AmperiumClient:
             "initializeFrom": _iso_z(now - datetime.timedelta(seconds=history_seconds)),
             "liveFeedTtlInSeconds": int(ttl_seconds),
         }
-        status, data = await self._request(
-            "POST", f"/api/sites/{site_id}/stream/amqp", json=body, auth=True
+        status, data = await self._auth_request(
+            "POST", f"/api/sites/{site_id}/stream/amqp", json=body
         )
         if status == 401:
             raise AmperiumAuthError("Access token not accepted for the live feed")
@@ -392,16 +401,38 @@ class AmperiumClient:
             raise AmperiumError(f"GET {label} failed (HTTP {status})")
         return data
 
-    async def async_fetch(
-        self, site_id: int, month_start: datetime.datetime | None = None
-    ) -> dict[str, Any]:
-        """Fetch and normalise the current-month data for one site."""
-        sites = await self.async_get_sites(month_start)
+    @staticmethod
+    def _pick_site(sites: list[dict[str, Any]], site_id: int) -> dict[str, Any]:
+        """The wanted site from the account's list (the first one if it is not there)."""
         site = next((s for s in sites if s.get("siteId") == site_id), None)
         if site is None:
             if not sites:
                 raise AmperiumError("No sites returned for this account")
             site = sites[0]
+        return site
+
+    async def async_fetch_han_status(
+        self, site_id: int, month_start: datetime.datetime | None = None
+    ) -> dict[str, Any]:
+        """Only the HAN module's status, for polling between the main polls.
+
+        The same call as the main poll (so nothing new is asked of the API), but only
+        the fields about the module are kept: online, signal (a 0-4 level; Amperium
+        gives no dBm) and the end of the newest hour Amperium has energy for.
+        """
+        site = self._pick_site(await self.async_get_sites(month_start), site_id)
+        usage = site.get("usageForCurrentMonth") or {}
+        return {
+            "han_online": site.get("hanPortMeterOnline"),
+            "han_signal": site.get("hanPortMeterSignal"),
+            "updated": usage.get("energyUpdatedOn"),
+        }
+
+    async def async_fetch(
+        self, site_id: int, month_start: datetime.datetime | None = None
+    ) -> dict[str, Any]:
+        """Fetch and normalise the current-month data for one site."""
+        site = self._pick_site(await self.async_get_sites(month_start), site_id)
 
         usage = site.get("usageForCurrentMonth") or {}
         charges = site.get("chargesForCurrentMonth") or {}

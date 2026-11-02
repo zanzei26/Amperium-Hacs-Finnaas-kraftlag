@@ -29,13 +29,17 @@ from .const import (
     DOMAIN,
     EXTENDED_SCAN_INTERVAL,
     ISSUE_LOGIN_EXPIRING,
+    MISSING_HOURS_GRACE,
+    MISSING_HOURS_LISTED,
     REAUTH_WARN_DAYS,
 )
 from .derived import (
     capacity_peaks,
+    changed_hours,
     current_price_bucket,
     days_until,
     local_month_bounds,
+    missing_hours,
     summarise_charges,
     summarise_energy,
     summarise_grid,
@@ -76,6 +80,12 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             refresh_expires_at=entry.data.get(CONF_REFRESH_EXPIRES),
         )
         self._expiry_warned = False
+        # The live feed (when the option is on); set by the sensor platform, used by the
+        # service amperium.koble_til_live.
+        self.live_feed: Any = None
+        # Hours without data last time we looked, to log when they are filled in.
+        self._missing_prev: set[datetime] | None = None
+        self._missing_month: datetime | None = None
 
     def _persist_tokens(self, tokens: dict[str, str | None]) -> None:
         """Store refreshed tokens (and their expiry) in the config entry at once.
@@ -148,6 +158,63 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         return data
 
+    async def async_refresh_han_status(self, _now: datetime | None = None) -> None:
+        """Read the HAN module's status between the main polls.
+
+        Only online, signal and the newest data are kept; everything else waits for the
+        main poll. Any failure is left to the main poll (including a login that is no
+        longer valid), so this never raises and never marks anything unavailable.
+        """
+        if not self.data:
+            return
+        _, month_start, _ = local_month_bounds(
+            dt_util.utcnow().astimezone(dt_util.DEFAULT_TIME_ZONE)
+        )
+        try:
+            status = await self.client.async_fetch_han_status(self._site_id, month_start)
+        except AmperiumError as err:
+            _LOGGER.debug("Could not read the HAN status: %s", err)
+            return
+        if status.get("han_online") != self.data.get("han_online"):
+            online = status.get("han_online")
+            _LOGGER.info(
+                "Amperium: the HAN module is now %s",
+                "unknown" if online is None else ("online" if online else "offline"),
+            )
+        if all(self.data.get(key) == value for key, value in status.items()):
+            return
+        self.data.update(status)
+        self.async_update_listeners()
+
+    def _track_missing_hours(
+        self, buckets: list[dict[str, Any]], month_start: datetime, now: datetime
+    ) -> dict[str, Any]:
+        """Which hours of this month Amperium has no data for, and a log line when that changes.
+
+        Nothing is fetched extra: the whole month is read again every hour, so an hour that
+        arrives late is picked up (and the statistics are rewritten) by the normal fetch.
+        """
+        missing = missing_hours(buckets, month_start, now, MISSING_HOURS_GRACE)
+        current = set(missing)
+        same_month = self._missing_month == month_start
+        appeared, filled = changed_hours(self._missing_prev if same_month else None, current)
+        self._missing_prev, self._missing_month = current, month_start
+        if filled:
+            _LOGGER.info(
+                "Amperium: %d hour(s) that were missing in the hourly data have arrived "
+                "(%s to %s)", len(filled), filled[0].isoformat(), filled[-1].isoformat(),
+            )
+        if appeared:
+            _LOGGER.info(
+                "Amperium: no hourly data for %d hour(s) (%s to %s); the month is read "
+                "again every hour and they are filled in when Amperium has them",
+                len(appeared), appeared[0].isoformat(), appeared[-1].isoformat(),
+            )
+        return {
+            "hours_missing_month": len(missing),
+            "hours_missing_list": [h.isoformat() for h in missing[-MISSING_HOURS_LISTED:]],
+        }
+
     async def _async_fetch_prices(self) -> dict[str, Any]:
         """Fetch hourly prices for today and tomorrow (local days).
 
@@ -213,6 +280,7 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         charges: list[dict[str, Any]] = []
         grid_responses: dict[str, dict[str, Any] | None] = {"": None, "_last_month": None}
         energy_ok = False
+        this_month_ok = False
         try:
             for start, end in windows:
                 if end <= start:
@@ -220,6 +288,7 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 try:
                     energy += await client.async_get_energy(site, start, end)
                     energy_ok = True
+                    this_month_ok = this_month_ok or start == this_start
                 except AmperiumAuthError:
                     raise
                 except AmperiumError as err:
@@ -241,6 +310,12 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         new.update(summarise_energy(energy, now, tz, day_start, day_end))
         new.update(capacity_peaks(energy, now, tz))
         new.update(summarise_charges(charges, now, tz))
+        if this_month_ok:
+            this_month = [
+                b for b in energy
+                if isinstance(b.get("start"), datetime) and b["start"] >= this_start
+            ]
+            new.update(self._track_missing_hours(this_month, this_start, now))
         for suffix, response in grid_responses.items():
             new.update(summarise_grid(response, suffix))
         # The billing split of day/night kWh comes straight from Amperium

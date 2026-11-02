@@ -65,6 +65,19 @@ LIVE_OBS_EXPORT = 102
 LIVE_FEED_TTL_SECONDS = 300
 # A live reading older than this is not shown as "now".
 LIVE_MAX_AGE_SECONDS = 120
+# With no reading for this long the live sensor becomes unavailable (not just unknown),
+# so a monitoring rule in Home Assistant can see that the feed is down.
+LIVE_DOWN_AFTER_SECONDS = 900
+
+# How often the HAN module's status (online, signal, newest data) is read between the main
+# polls. The main poll runs every DEFAULT_SCAN_INTERVAL.
+HAN_STATUS_INTERVAL = 300
+# Hours at the end of the month are not counted as missing until they are this old, because
+# Amperium publishes an hour a few minutes after it ends (and a module that is offline
+# delivers late).
+MISSING_HOURS_GRACE = 2
+# At most this many missing hours are listed as an attribute.
+MISSING_HOURS_LISTED = 48
 
 # Hours (local time) counted as "day" for the day/night consumption split.
 # Configurable in the integration options. Weekends are not treated specially.

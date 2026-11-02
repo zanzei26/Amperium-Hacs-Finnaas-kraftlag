@@ -19,6 +19,8 @@ Strømforbruk, kostnad og pris **direkte fra Finnås Kraftlag** via Amperium-pla
 - Timeforbruk importert som statistikk til Energidashbordet (velg «Amperium forbruk»)
 - HAN-måler online (binær)
 - Når innloggingen utløper (diagnostikk), med varsel i god tid
+- HAN-status hvert 5. minutt, siste data fra HAN-måleren og antall timer Amperium mangler data for (diagnostikk)
+- Live-strøm som kommer tilbake av seg selv, med status-sensor og handlingen `amperium.koble_til_live`
 - Strømregnskap: nettleie før støtte, fast månedspris, Norgespris og snittpris for forrige måned, og handlingen `amperium.hent_periode` for valgfrie perioder
 
 ## Oppsett

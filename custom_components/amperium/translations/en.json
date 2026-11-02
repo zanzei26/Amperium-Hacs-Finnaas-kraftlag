@@ -236,6 +236,23 @@
       },
       "avg_price_month": {
         "name": "Average price this month (your scheme, incl. fixed monthly price)"
+      },
+      "amperium_live_status": {
+        "name": "Amperium live status",
+        "state": {
+          "off": "Off",
+          "starting": "Starting",
+          "connecting": "Connecting",
+          "connected": "Connected",
+          "error": "Error",
+          "unavailable": "Unavailable"
+        }
+      },
+      "han_last_data": {
+        "name": "HAN latest data"
+      },
+      "hours_missing_month": {
+        "name": "Missing hours this month"
       }
     },
     "binary_sensor": {
@@ -293,6 +310,16 @@
           "name": "To",
           "description": "The day the period ends: this day is NOT included (00:00 local time). A date and time is taken exactly."
         },
+        "entry_id": {
+          "name": "Entry",
+          "description": "Which Amperium entry to use. Only needed with more than one."
+        }
+      }
+    },
+    "koble_til_live": {
+      "name": "Reconnect live feed",
+      "description": "Drops Amperium's live stream and subscribes again at once, with the waiting between attempts reset. Use it when \"Power now (Amperium live)\" is unavailable and you do not want to restart Home Assistant. Only has an effect when the option \"I have a Dobbe module\" is on.",
+      "fields": {
         "entry_id": {
           "name": "Entry",
           "description": "Which Amperium entry to use. Only needed with more than one."

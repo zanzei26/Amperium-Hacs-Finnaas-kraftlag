@@ -57,8 +57,10 @@ Sensorer per anlegg:
 | `sensor.*_eksport_*` | Eksport (solceller), avslått som standard. Slå på hvis du produserer strøm |
 | `sensor.*_han_signal` | HAN-signalstyrke (diagnostikk) |
 | `sensor.*_han_signalkvalitet` | HAN-signal som tekst: Ingen signal, Dårlig, Middels, Bra, Veldig bra, Ingen data eller Ikke på nett (diagnostikk) |
-| `binary_sensor.*_han_maler_online` | Om HAN-måleren er online (diagnostikk) |
-| «Innlogging gyldig til» | Når innloggingen (fornyelsestokenet) utløper (diagnostikk). Tom hvis Amperium ikke har oppgitt tidspunktet, se «Innlogging og oppdateringer» |
+| `binary_sensor.*_han_maler_online` | Om HAN-måleren er online (diagnostikk). Leses hvert 5. minutt, se «HAN-måleren: offline og hull i timedata» |
+| «HAN siste data» | Slutten av den nyeste timen Amperium har forbruk for (tidsstempel, diagnostikk). Samme tidspunkt som attributtet `updated` på «Forbruk denne måneden». Oppdateres én gang i timen, så ikke bruk den til å se sekunder |
+| «Manglende timer denne måneden» | Hvor mange hele timer i måneden Amperium ikke har noe forbruk for, inne i dataene (diagnostikk). Timene står som attributtet `hours` (opptil 48). De to nyeste timene regnes ikke med ennå |
+| «Innlogging gyldig til» | Når innloggingen (fornyelsestokenet) utløper (diagnostikk). Lages bare når Amperium har oppgitt tidspunktet, ellers finnes den ikke (en eldre sensor uten tidspunkt fjernes ved start fra 0.13.0), se «Innlogging og oppdateringer» |
 | «Innlogging fornyes» | Når gjeldende tilgangstoken utløper og fornyes automatisk (diagnostikk). Flytter seg 5 døgn fram ved hver fornyelse |
 
 Sensorene nullstilles daglig/månedlig, så de passer best som egne dashbordkort (se [`examples/lovelace-amperium.yaml`](examples/lovelace-amperium.yaml)).
@@ -102,6 +104,25 @@ Amperium-appen viser live effekt fra en egen sanntidsstrøm (RabbitMQ/AMQP). Fel
 «Effekt nå» bruker denne rekkefølgen: **din egen effektsensor** (se over), så **Amperium live** (siste måling må være under to minutter gammel), så Amperiums timeverdi. Attributtet `source` viser hva som er brukt (`local_sensor`, `amperium_live` eller `amperium`).
 
 **Bekreftet i tester 3. oktober 2026, ikke over lang tid.** Meldingsformatet er lest fra appens kode. Tester i en ekte Home Assistant (én konto med Dobbe-modul) viste status `connected`, omtrent én måling hvert annet sekund, og verdier identiske med en lokal Tibber Pulse (1201 W mot 1,201 kW). Enheten fra Amperium er watt. I en overvåking på 15 minutter kom det meldinger uten opphold gjennom flere fornyelser av abonnementet (hvert 4. minutt). Det vanlige HTTP-kallet alene gir en tom liste, så live kommer bare via strømmen. Se attributtene på «Effekt nå (Amperium live)»: `status` (`connecting`, `connected`, `error`, `unavailable`), `messages` (antall mottatt), `age_seconds`, `last_error` (bare mens det er et problem) og `last_error_at`. Står den på `connected` mens `messages` forblir 0, leverer måleren ikke live-målinger til Amperium akkurat nå. Et svakt mobilsignal på HAN-modulen (se «HAN-signalkvalitet») kan være årsaken, men det er ikke bekreftet. Meld fra under Issues hva du ser, særlig hvis du ikke har Dobbe-modul, eller hvis forbindelsen faller ut over tid.
+
+#### Når live-strømmen svikter (fra 0.13.0)
+
+- **Nytt abonnement for hvert forsøk.** Hvert forsøk ber Amperium om nye tilkoblingsopplysninger, og opplysninger fra et tidligere forsøk brukes aldri om igjen. Er tilgangstokenet utløpt, fornyes det først (som ved alle andre kall) og kallet gjentas én gang.
+- **Ventetid mellom forsøk** øker ved feil fra 5 sekunder til 10 minutter og blir der, og starter på nytt når målinger kommer igjen. Ender strømmen bare eller er den stille (måleren sender ikke), går ventetiden aldri over 5 minutter.
+- **Loggen** får én advarsel når et problem begynner (og en ny hvis feilteksten endrer seg) og én melding «working again» når det virker igjen. Ikke en linje per forsøk. Står det «(same connection details as the attempt before)» i feilen, ga Amperium de samme opplysningene to ganger på rad etter en avvisning.
+- **Utilgjengelig.** Uten måling i 15 minutter blir «Effekt nå (Amperium live)» **utilgjengelig** (før det er den ukjent), så en overvåkingsregel i Home Assistant kan fange det. Home Assistant skjuler attributtene til en utilgjengelig sensor. Derfor finnes samme informasjon på diagnostikksensoren **Amperium live status** (tilstand: `off`, `starting`, `connecting`, `connected`, `error` eller `unavailable`), som alltid er tilgjengelig. Attributtene `feil` (siste feiltekst, tom når det virker) og `siste_melding` (når siste måling kom) ligger på begge sensorene, i tillegg til `status`, `messages` og de andre som fantes fra før. Status-sensoren skrives ved endringer og ellers høyst én gang i minuttet.
+- **Handlingen `amperium.koble_til_live`** dropper strømmen og abonnerer på nytt med en gang, med ventetiden nullstilt, uten å starte Home Assistant på nytt. Den kan brukes fra en automasjon, for eksempel når «Amperium live status» har stått på `error` i en halvtime. Den feiler med en forklaring hvis valget «Jeg har en Dobbe-modul» er av.
+- **Slå live-strømmen av:** fjern «Jeg har en Dobbe-modul» under Konfigurer. Vanlig «Effekt nå» (per time) og alt annet er upåvirket.
+
+**Ikke avklart:** 30. oktober kl. 22:00 til 1. november kl. 24:00 var sensoren ukjent i 15,8 av 50 timer i Home Assistant (96 perioder). Loggen 1. november viste «Network error» med 5,5 minutters mellomrom. Det passer med tidsavbruddet på 30 sekunder pluss ventetiden på 300 sekunder, så kallet som oppretter abonnementet ser ut til å ha fått tidsavbrudd (utledet, ikke målt direkte). Det er også rapportert ACCESS_REFUSED fra meldingskøen 31. oktober (ikke kontrollert, loggen fra da er borte). Årsaken er ikke funnet, og den er ikke at gamle opplysninger gjenbrukes: det gjorde ikke koden før 0.13.0 heller. Integrasjonen kan ikke gjøre noe med at Amperium ikke svarer, bare vente og prøve igjen uten å fylle loggen. Utholdenheten over tid er ikke målt etter 0.13.0.
+
+### HAN-måleren: offline og hull i timedata
+
+- **Status hvert 5. minutt.** «HAN-måler online», «HAN-signal» og «HAN siste data» leses hvert 5. minutt (med samme kall som hovedhentingen, som går hvert 15. minutt). Før kunne et utfall på under 15 minutter forsvinne mellom to lesninger. Appen viser mer fordi den spør oftere. Hvert skifte mellom online og offline står i loggen (nivå info).
+- **Signalet er et nivå fra 0 til 4**, ikke dBm. Amperium gir ikke dBm. «HAN-signal» viser nivået og «HAN-signalkvalitet» navnet på det.
+- **Det går ikke an å koble HAN-modulen til igjen herfra.** Online-status er modulens egen forbindelse til Amperium-skyen (Wi-Fi eller mobil), og Amperium har ikke noe kall for å starte den på nytt. Integrasjonen har derfor ingen «reconnect» mot modulen. Står den på «Dårlig» eller «Ingen signal», hjelper det å flytte den, for eksempel ut av et metallskap.
+- **Hull i timedata.** Hele måneden hentes på nytt hver time, og statistikken for Energidashbordet skrives om hver gang. En time som Amperium leverer i ettertid kommer derfor med av seg selv, og det er ikke noe mer å fylle inn herfra. Er en time aldri levert, finnes det heller ikke noe tall å vise, og integrasjonen finner ikke på noe. «Forbruk denne måneden» og de andre månedstallene fra Amperium er da for lave med dette forbruket. «Manglende timer denne måneden» teller hullene (inne i dataene, de to nyeste timene regnes ikke med), og loggen (nivå info) sier fra når timer mangler og når de kommer. 1. november 2026 manglet timene 15:00 og 16:00 UTC (kl. 16 og 17 norsk tid) i Amperiums data selv flere timer etterpå (sett kl. 23 samme kveld), uten at det ble forklart.
+- Vil du varsles om at HAN-måleren har vært borte lenge, bruk «HAN-måler online» med `for:`, eller `now() - states('sensor.…han_siste_data')` større enn 90 minutter.
 
 ### Kostnad: brutto, støtte og netto
 
@@ -221,7 +242,7 @@ Tokenene (målt fra svar fra Amperium, ikke dokumentert av dem): tilgangstokenet
 
 - **Token fornyes automatisk** når det utløper. Treffer flere forespørsler 401 samtidig, sendes bare én fornyelse, og de andre bruker det nye tokenet. Nye tokens lagres med en gang.
 - **Feil hos Amperium logger deg ikke ut.** Bare når Amperium selv avviser tokenet (HTTP 400/401/403) ber integrasjonen deg logge inn på nytt. Tjenestefeil (HTTP 5xx, 429, nettverk) gir bare en midlertidig feil.
-- **Du ser når innloggingen utløper.** Diagnostikksensoren «Innlogging gyldig til» viser tidspunktet Amperium har oppgitt for fornyelsestokenet. Amperium oppgir ikke alltid dette tidspunktet (se over), og da er sensoren tom. Da kan heller ikke varselet under komme, så logg inn på nytt hvis Home Assistant ber om det.
+- **Du ser når innloggingen utløper.** Diagnostikksensoren «Innlogging gyldig til» viser tidspunktet Amperium har oppgitt for fornyelsestokenet. Amperium oppgir ikke alltid dette tidspunktet (se over), og da lages ikke sensoren (fra 0.13.0; før var den ukjent for alltid). «Innlogging fornyes» finnes uansett. Uten tidspunktet kan heller ikke varselet under komme, så logg inn på nytt hvis Home Assistant ber om det.
 - **Varsel i god tid.** Er det under 30 dager igjen, kommer et varsel under Reparasjoner, og «Konfigurer på nytt» åpnes. Du får en ny engangskode på SMS til samme nummer. Husk døgngrensen for engangskoder.
 - **Må du logge inn på nytt av andre grunner** (for eksempel etter lang tid uten kontakt), viser Home Assistant «Konfigurer på nytt» på integrasjonen.
 - **Loggen** (nivå info) viser hver fornyelse med utløpstidene, uten tokenverdier: «Amperium token refreshed; refresh token expires … (was …)». Der ser du om fristen på ca. ett år løper videre ved hver fornyelse eller ligger fast. Det er ikke avklart ennå.
@@ -238,10 +259,11 @@ Amperium bruker passordløs OTP-innlogging i tillegg til en statisk app-nøkkel 
 5. Henter timepriser: `GET /api/sites/{id}/prices?from=…&to=…` (i dag og i morgen)
 6. Henter timeforbruk: `GET /api/sites/{id}/consumption/energy?from=…&to=…&resolution=H`
 7. Henter kostnad: `GET /api/sites/{id}/consumption/charges?from=…&to=…&resolution=H`
+8. Live effekt (bare med Dobbe-modul): `POST /api/sites/{id}/stream/amqp`, og så kobler den til meldingskøen i svaret.
 
 `resolution` må være én bokstav (`H`, `D` eller `M`). Ord og tall avvises av API-et. Timedata hentes høyst en gang i timen.
 
-Polling hvert 15. minutt (HAN-måleren oppdateres time for time).
+Polling hvert 15. minutt (HAN-måleren oppdateres time for time). HAN-status (online, signal, siste data) leses i tillegg hvert 5. minutt med det samme kallet som punkt 4.
 
 ## Ansvarsfraskrivelse
 
