@@ -282,8 +282,14 @@ MIT – se [LICENSE](LICENSE).
 
 ## Utvikling
 
-De rene beregningene (`derived.py`, `hourpower.py`, deler av `api.py`) har tester som ikke trenger Home Assistant:
+De rene beregningene og logikken (`derived.py`, `hourpower.py`, `api.py`, `amqp_feed.py`, `period.py`) har tester som ikke trenger Home Assistant. Delene som er skrevet mot Home Assistant (`sensor.py`, `coordinator.py`, `config_flow.py`, `__init__.py`, `statistics.py`, `binary_sensor.py`, `live.py`) har ingen automatiske tester ennå. De er bare prøvd i en ekte Home Assistant.
 
 ```
-cd tests && python -m pytest
+pip install -r requirements-dev.txt   # pytest, pytest-cov, aiohttp og ruff, med låste versjoner
+ruff check .                          # lint, innstillinger i pyproject.toml
+pytest                                # testene; legg til --cov=custom_components/amperium for dekning
 ```
+
+Testene ligger i én fil per modul (`tests/test_api.py`, `test_amqp_feed.py`, `test_derived.py`, …), og eksempeldata som flere filer bruker ligger i `tests/helpers.py`.
+
+GitHub Actions (`.github/workflows/`): `ci.yml` kjører lint og tester på Python 3.12 og 3.14, Home Assistants `hassfest` og HACS-valideringen for hver endring. `release.yml` lager bare en utgivelse når lint og tester består.

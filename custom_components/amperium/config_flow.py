@@ -5,7 +5,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers import issue_registry as ir
@@ -27,9 +26,9 @@ from .api import (
 from .const import (
     CONF_ACCESS_EXPIRES,
     CONF_ACCESS_TOKEN,
-    CONF_HAS_DOBBE,
     CONF_DAY_END,
     CONF_DAY_START,
+    CONF_HAS_DOBBE,
     CONF_PHONE,
     CONF_POWER_ENTITY,
     CONF_REFRESH_EXPIRES,

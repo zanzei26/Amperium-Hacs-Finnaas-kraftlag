@@ -1,0 +1,37 @@
+# Settings for the development tools only. The integration is not a Python package:
+# Home Assistant loads it from custom_components/amperium/.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+# The oldest Home Assistant the integration supports (hacs.json) runs Python 3.12.
+target-version = "py312"
+# The code keeps to about 100 characters; this also decides how imports are wrapped.
+line-length = 100
+extend-exclude = [".github"]
+
+[tool.ruff.lint]
+select = [
+    "E4", "E7", "E9",  # pycodestyle errors (not line length)
+    "F",               # pyflakes: unused and undefined names
+    "I",               # sorted imports
+    "B",               # likely bugs
+    "BLE",             # blind "except Exception" must say why (a # noqa with the reason)
+    "UP",              # old syntax
+    "C4",              # needless collection calls
+    "DTZ",             # datetimes without a time zone
+    "RUF",             # ruff's own checks
+]
+ignore = [
+    # The code spells UTC as datetime.timezone.utc on purpose (explicit, same on every version).
+    "UP017",
+    # The Norwegian texts use en dashes ("Amperium – Testveien 1") on purpose.
+    "RUF001", "RUF002", "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "DTZ001",  # tests build naive datetimes on purpose, to check how they are read
+]

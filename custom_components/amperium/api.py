@@ -241,7 +241,7 @@ class AmperiumClient:
         """
         now = datetime.datetime.now(datetime.timezone.utc)
         frm = month_start or now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        path = "/api/sites?charges_from=%s&charges_to=%s" % (_iso_z(frm), _iso_z(now))
+        path = f"/api/sites?charges_from={_iso_z(frm)}&charges_to={_iso_z(now)}"
         return await self._auth_get(path)
 
     async def async_get_sites(

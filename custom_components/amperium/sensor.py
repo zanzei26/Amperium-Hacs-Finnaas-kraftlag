@@ -42,10 +42,10 @@ from .derived import (
     SIGNAL_STATES,
     ChangeGate,
     choose_power_now,
-    current_spot_price,
     compensation_difference,
     compensation_for_scheme,
     consumer_price,
+    current_spot_price,
     gross_grid_from_net,
     gross_grid_rent,
     gross_total_from_net,
@@ -1046,7 +1046,6 @@ class AmperiumLiveStatusSensor(SensorEntity):
     _attr_should_poll = False
     _attr_translation_key = "amperium_live_status"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = list(LIVE_STATUSES)
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _unrecorded_attributes = frozenset(
         {"status", "messages", "age_seconds", "observed_at", "last_error", "last_error_at",
@@ -1057,6 +1056,7 @@ class AmperiumLiveStatusSensor(SensorEntity):
         """Initialise the sensor."""
         self._state = state
         self._gate = ChangeGate()
+        self._attr_options = list(LIVE_STATUSES)
         site_id = entry.data[CONF_SITE_ID]
         site_name = entry.data.get(CONF_SITE_NAME) or f"Site {site_id}"
         self._attr_unique_id = f"{entry.entry_id}_amperium_live_status"
