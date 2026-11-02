@@ -1,0 +1,5 @@
+# For the tests in tests_ha/, which run the integration inside a real Home Assistant.
+# Needs Python 3.14 (what Home Assistant 2026.10 runs). This package pins the Home Assistant
+# version it matches (2026.10.4 for 0.13.375), pytest and everything else it needs.
+# Run:  pytest -c tests_ha/pytest.ini tests_ha
+pytest-homeassistant-custom-component==0.13.375
