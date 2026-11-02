@@ -58,7 +58,7 @@ class AmperiumConfigFlow(ConfigFlow, domain=DOMAIN):
         self._sites: list[dict[str, Any]] = []
         self._site: dict[str, Any] | None = None
         self._scheme: str | None = None
-        self._reauth_entry_id: str | None = None
+        self._reauth_target_id: str | None = None
 
     # ------------------------------------------------------------------ #
     # Re-authentication: Home Assistant starts this when the token pair is
@@ -66,7 +66,7 @@ class AmperiumConfigFlow(ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------ #
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
         """Start re-authentication for an existing entry."""
-        self._reauth_entry_id = self.context["entry_id"]
+        self._reauth_target_id = self.context["entry_id"]
         self._phone = entry_data[CONF_PHONE]
         return await self.async_step_reauth_confirm()
 
@@ -107,7 +107,7 @@ class AmperiumConfigFlow(ConfigFlow, domain=DOMAIN):
             except AmperiumError:
                 errors["base"] = "cannot_connect"
             else:
-                entry = self.hass.config_entries.async_get_entry(self._reauth_entry_id)
+                entry = self.hass.config_entries.async_get_entry(self._reauth_target_id)
                 if entry is None:
                     return self.async_abort(reason="reauth_failed")
                 self.hass.config_entries.async_update_entry(

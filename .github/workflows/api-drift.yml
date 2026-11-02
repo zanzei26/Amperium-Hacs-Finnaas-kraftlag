@@ -1,0 +1,61 @@
+name: API and Home Assistant drift
+
+# Every Monday, and by hand. Neither Amperium nor Home Assistant tells us before they change
+# something, so this looks:
+#  - does Amperium's published API description still have everything the integration uses?
+#  - does the integration still work with the newest Home Assistant (not the pinned version)?
+# A failure here is a warning about something outside this repository, not a broken change.
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  amperium-api:
+    name: Amperium API description
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install the development tools
+        run: pip install -r requirements-dev.txt
+
+      - name: Fetch the live API description
+        run: curl -fsS --max-time 60 https://api.amperium.cloud/swagger/v1/swagger.json -o live-swagger.json
+
+      - name: What has changed since the saved copy (information)
+        run: python tests/contract/diff_spec.py tests/contract/swagger.json live-swagger.json || true
+
+      - name: The fields the integration uses are still there
+        run: AMPERIUM_SWAGGER=live-swagger.json pytest tests/test_contract.py
+
+  home-assistant-latest:
+    name: Newest Home Assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      # Unpinned on purpose: the newest release of the test package brings the newest Home Assistant.
+      - name: Install the newest Home Assistant and test tools
+        run: pip install --upgrade pytest-homeassistant-custom-component
+
+      - name: Home Assistant version
+        run: python -c "import homeassistant.const as c; print('Home Assistant', c.__version__)"
+
+      - name: Tests
+        run: pytest -c tests_ha/pytest.ini tests_ha
