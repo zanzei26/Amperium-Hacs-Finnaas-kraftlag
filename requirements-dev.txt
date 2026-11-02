@@ -1,0 +1,7 @@
+# Tools for developing and testing the integration. Home Assistant itself is not needed:
+# the tests only load the modules that do not import it (see tests/conftest.py).
+# Pinned to the versions the tests were last run with.
+pytest==9.2.0
+pytest-cov==7.1.0
+aiohttp==3.14.5
+ruff==0.17.3

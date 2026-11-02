@@ -12,7 +12,12 @@ permissions:
   contents: write
 
 jobs:
+  # A release is only made from code that passes the lint and the tests.
+  checks:
+    uses: ./.github/workflows/tests.yml
+
   release:
+    needs: checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

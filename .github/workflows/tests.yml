@@ -1,0 +1,39 @@
+name: Tests
+
+# Lint and unit tests. Called by ci.yml (every push and pull request) and by release.yml
+# (a release is only made when these pass). Can also be run by hand from the Actions tab.
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint and tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is what the oldest Home Assistant the integration supports (hacs.json) runs;
+        # 3.14 is what Home Assistant 2026.10 runs.
+        python: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install the development tools
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Tests
+        run: pytest --cov=custom_components/amperium --cov-report=term

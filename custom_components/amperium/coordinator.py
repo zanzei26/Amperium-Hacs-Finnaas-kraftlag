@@ -331,7 +331,7 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await async_import_statistics(
                 self.hass, site, energy, charges, producing, now
             )
-        except Exception:  # noqa: BLE001 - statistics are optional
+        except Exception:  # statistics are optional; logged with the traceback
             _LOGGER.warning("Could not import statistics", exc_info=True)
 
         local_now = now.astimezone(tz)
