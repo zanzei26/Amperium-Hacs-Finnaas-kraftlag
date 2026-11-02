@@ -282,7 +282,9 @@ MIT – se [LICENSE](LICENSE).
 
 ## Utvikling
 
-De rene beregningene og logikken (`derived.py`, `hourpower.py`, `api.py`, `amqp_feed.py`, `period.py`) har tester som ikke trenger Home Assistant. Delene som er skrevet mot Home Assistant (`sensor.py`, `coordinator.py`, `config_flow.py`, `__init__.py`, `statistics.py`, `binary_sensor.py`, `live.py`) har ingen automatiske tester ennå. De er bare prøvd i en ekte Home Assistant.
+Det er to sett med tester:
+
+**Uten Home Assistant (`tests/`).** De rene beregningene og logikken (`derived.py`, `hourpower.py`, `api.py`, `amqp_feed.py`, `period.py`), og kontrolltester mot Amperiums API-beskrivelse.
 
 ```
 pip install -r requirements-dev.txt   # pytest, pytest-cov, aiohttp og ruff, med låste versjoner
@@ -290,6 +292,15 @@ ruff check .                          # lint, innstillinger i pyproject.toml
 pytest                                # testene; legg til --cov=custom_components/amperium for dekning
 ```
 
-Testene ligger i én fil per modul (`tests/test_api.py`, `test_amqp_feed.py`, `test_derived.py`, …), og eksempeldata som flere filer bruker ligger i `tests/helpers.py`.
+Testene ligger i én fil per modul (`tests/test_api.py`, `test_amqp_feed.py`, `test_derived.py`, …), og eksempeldata som flere filer bruker ligger i `tests/helpers.py`. `tests/test_contract.py` sjekker at hvert endepunkt, hver parameter og hvert felt integrasjonen bruker finnes i Amperiums offentlige API-beskrivelse (`tests/contract/swagger.json`, en lagret kopi). `tests/test_fake_api_matches_spec.py` sjekker at de oppdiktede svarene i testene under bare bruker felt fra den beskrivelsen.
 
-GitHub Actions (`.github/workflows/`): `ci.yml` kjører lint og tester på Python 3.12 og 3.14, Home Assistants `hassfest` og HACS-valideringen for hver endring. `release.yml` lager bare en utgivelse når lint og tester består.
+**I en ekte Home Assistant (`tests_ha/`).** Hele integrasjonen kjøres i Home Assistant 2026.10.4 (Python 3.14): oppsett og fjerning, alle sensorene fra svar til tilstand (blant annet september-fakturaen), handlingene, oppsettsflyt, alternativer og ny innlogging, HAN-status, manglende timer, statistikk og live-sensorene. Svarene fra Amperium er oppdiktet, men går gjennom den ekte API-klienten (`tests_ha/fake_api.py` erstatter bare selve HTTP-kallet).
+
+```
+pip install -r requirements-test-ha.txt   # krever Python 3.14; henter Home Assistant 2026.10.4
+pytest -c tests_ha/pytest.ini tests_ha    # tar ca. to minutter
+```
+
+Dekningen er målt: se `CHANGELOG.md` (0.13.1). Delene som ikke dekkes er blant annet selve AMQP-tilkoblingen (`consume_with_aio_pika` mot en ekte meldingskø) og den virkelige Amperium-tjenesten.
+
+GitHub Actions (`.github/workflows/`): `ci.yml` kjører lint, enhetstester (Python 3.12 og 3.14), testene i Home Assistant, Home Assistants `hassfest` og HACS-valideringen for hver endring. `release.yml` lager bare en utgivelse når lint og testene består. `api-drift.yml` kjører hver mandag: den ser om Amperiums levende API-beskrivelse fortsatt har feltene vi bruker, og om integrasjonen fortsatt virker med den nyeste Home Assistant. Hvordan vi jobber (gren, pull request, grønn CI, fletting) står i [CONTRIBUTING.md](CONTRIBUTING.md).
