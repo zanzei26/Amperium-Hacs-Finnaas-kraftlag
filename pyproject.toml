@@ -27,7 +27,7 @@ select = [
 ignore = [
     # The code spells UTC as datetime.timezone.utc on purpose (explicit, same on every version).
     "UP017",
-    # The Norwegian texts use en dashes ("Amperium – Hallaråkervegen") on purpose.
+    # The Norwegian texts use en dashes ("Amperium – Testveien 1") on purpose.
     "RUF001", "RUF002", "RUF003",
 ]
 

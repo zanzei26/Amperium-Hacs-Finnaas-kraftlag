@@ -1,0 +1,20 @@
+# Weekly look for new versions of the GitHub actions and the Python tools. Every update arrives as a
+# pull request and has to pass CI (including the tests in a real Home Assistant) before it is merged.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      actions:
+        patterns: ["*"]
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5

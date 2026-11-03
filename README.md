@@ -214,6 +214,8 @@ Sensoren **Spotpris nå** har attributtene `official` (om prisen er offisiell el
 
 ## Installasjon (HACS)
 
+Krever **Home Assistant 2026.10.4 eller nyere**. Det er den eneste versjonen integrasjonen er testet mot (tidligere sto det 2024.6, men det var aldri prøvd). Eldre versjoner kan virke, men er ikke undersøkt.
+
 1. HACS → ⋮ → **Egendefinerte arkiv** (Custom repositories).
 2. Lim inn URL-en til dette repoet, kategori **Integration**.
 3. Søk opp **Amperium** i HACS og installer.
@@ -264,6 +266,10 @@ Amperium bruker passordløs OTP-innlogging i tillegg til en statisk app-nøkkel 
 `resolution` må være én bokstav (`H`, `D` eller `M`). Ord og tall avvises av API-et. Timedata hentes høyst en gang i timen.
 
 Polling hvert 15. minutt (HAN-måleren oppdateres time for time). HAN-status (online, signal, siste data) leses i tillegg hvert 5. minutt med det samme kallet som punkt 4.
+
+## Sikkerhet
+
+Hva integrasjonen lagrer, hvor den kobler til, og hvordan du melder en sårbarhet står i [SECURITY.md](SECURITY.md). Kort: telefonnummer og tokens ligger i Home Assistants lagring (ikke kryptert, som hos andre integrasjoner), og ingenting sendes til andre enn Amperium.
 
 ## Ansvarsfraskrivelse
 
