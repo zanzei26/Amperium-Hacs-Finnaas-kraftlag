@@ -342,7 +342,7 @@ def test_the_invoice_lines_add_up_to_the_invoice_totals():
 
 def test_house_cost_and_price_reproduce_the_september_invoice():
     cost = derived.house_cost("norgespris", SEPT["energy"], SEPT["grid_after"], SEPT["compensation"], SEPT["norgespris"])
-    assert cost == pytest.approx(2325.35)                      # invoice: Totalt 2325,35
+    assert cost == pytest.approx(2325.35)                      # the invoice's "Totalt"
     assert derived.price_per_kwh(cost, SEPT["kwh"]) == pytest.approx(1.3002, abs=5e-5)
 
 
@@ -410,7 +410,7 @@ def test_period_end_date_is_not_included_and_dates_count_in_local_time_summer():
     assert (_iso(start), _iso(end)) == ("2026-08-31T22:00:00Z", "2026-09-30T22:00:00Z")
 
 
-def test_period_across_a_month_end_like_the_tenants_30_08_to_01_10():
+def test_period_across_a_month_end_30_08_to_01_10():
     start, end = derived.resolve_period("2026-08-30", "2026-10-01", OSLO)
     assert (_iso(start), _iso(end)) == ("2026-08-29T22:00:00Z", "2026-09-30T22:00:00Z")
     assert (end - start) == dt.timedelta(hours=32 * 24)       # 30 and 31 August + 30 days of September
@@ -465,14 +465,14 @@ def test_period_summary_for_september_matches_the_invoice_figures():
     assert out["fixed_monthly_price"] == pytest.approx(25.0)
     # the fixed monthly price is a part of Kraft, not an addition to it
     assert out["energy_gross"] - out["energy_gross_hourly_sum"] == pytest.approx(out["fixed_monthly_price"], abs=0.005)
-    assert out["vat_on_energy"] == pytest.approx(643.90, abs=0.005)              # invoice: Herav MVA 643,90
+    assert out["vat_on_energy"] == pytest.approx(643.90, abs=0.005)              # the invoice's "Herav MVA"
     assert out["grid_after_support"] == pytest.approx(-112.40)
     assert out["subsidy_applied"] == pytest.approx(1455.05, abs=0.005)
-    assert out["grid_before_support"] == pytest.approx(1342.65, abs=0.005)       # invoice: Nettleige
+    assert out["grid_before_support"] == pytest.approx(1342.65, abs=0.005)       # the invoice's "Nettleie"
     assert out["capacity_charge"] == pytest.approx(400.0)
     assert out["grid_before_support_excl_capacity"] == pytest.approx(942.65, abs=0.005)
     assert out["norgespris_compensation"] == pytest.approx(2236.80, abs=0.005)
-    assert out["house_cost_norgespris"] == pytest.approx(2325.35, abs=0.005)     # invoice: Totalt
+    assert out["house_cost_norgespris"] == pytest.approx(2325.35, abs=0.005)     # the invoice's "Totalt"
     assert out["house_cost_subsidy"] == pytest.approx(3219.50 - 112.40, abs=0.005)
     assert out["price_per_kwh_norgespris"] == pytest.approx(1.3002, abs=5e-5)
     assert "fixed_fee" not in out and "price_per_kwh_norgespris_incl_fixed" not in out

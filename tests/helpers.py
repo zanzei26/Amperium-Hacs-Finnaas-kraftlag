@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from conftest import api, derived
 
 UTC = dt.timezone.utc
-COMP = 118.45260713  # October figures from a live account (3 days)
+COMP = 118.45260713  # the subsidy (compensation) of an invented three-day period
 
 
 OSLO = ZoneInfo("Europe/Oslo")
@@ -40,7 +40,9 @@ def _hourly(start, count, *, kwh=1.0, energy=1.0, tax=0.2, norgespris=0.5):
 PERIOD_NOW = dt.datetime(2026, 10, 25, 12, 0, tzinfo=UTC)
 
 
-# Invoice 0000000 for September 2026 (Finnås Kraftlag), line by line.
+# An INVENTED invoice for September 2026, line by line. Every figure here is made up; only the way
+# the lines relate to each other (Kraft holds the fixed monthly price, VAT is 20 % of the gross
+# amount, the grid rent has no fixed charge, Norgespris is deducted) follows a real invoice.
 KRAFT_LINES = {"kraftpris": 3110.40, "paslag": 84.10, "fast_manedspris": 25.00, "oss_modul": 0.0}
 INVOICE = {"kraft": 3219.50, "nettleie": 1342.65, "norgespris": 2236.80, "kwh": 1788.520, "kraft_mva": 643.90, "total": 2325.35}
 

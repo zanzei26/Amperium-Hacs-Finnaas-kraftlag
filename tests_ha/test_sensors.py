@@ -1,6 +1,6 @@
 """What the sensors show, from the fake API's answers all the way to the entity states.
 
-September 2026 is last month and uses invoice 0000000 (Kraft 3219.50, Nettleie 1342.65,
+September 2026 is last month and uses an invented invoice (Kraft 3219.50, Nettleie 1342.65,
 Norgespris -2236.80, Totalt 2325.35, 1788.520 kWh, 1.3002 kr/kWh).
 """
 from __future__ import annotations

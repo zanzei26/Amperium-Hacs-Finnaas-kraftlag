@@ -4,8 +4,8 @@ It replaces the one method that talks HTTP (``AmperiumClient._request``) and ans
 the same JSON shapes the real API gives. Everything above that (the client's parsing, the
 coordinator, the entities) is the real code.
 
-The numbers for September 2026 are the ones on invoice 0000000 (see tests/helpers.py), so a
-test can check what a sensor shows against what the electricity company charged.
+The numbers for September 2026 are those of an invented invoice (see tests/helpers.py), so a
+test can check what a sensor shows against what that invoice says.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ SITE_ID = 7001
 SITE_NAME = "Testveien 1"
 PHONE = "+4790000000"
 
-# --- September 2026, from the invoice -----------------------------------------------------
+# --- September 2026, from the invented invoice -----------------------------------------------------
 SEPT_START = dt.datetime(2026, 8, 31, 22, tzinfo=UTC)  # 1 Sept 00:00 Europe/Oslo
 SEPT_END = dt.datetime(2026, 9, 30, 22, tzinfo=UTC)  # 1 Oct 00:00 Europe/Oslo
 SEPT_HOURS = 720
