@@ -1,0 +1,89 @@
+name: Move release tags (one-off)
+
+# Used once, by hand (Actions tab -> "Move release tags (one-off)" -> Run workflow).
+# The history was rewritten to take personal data out of old commits; this moves the 25 release
+# tags to the rewritten commits. It changes nothing unless every check passes first:
+#   - each new commit must be reachable from main,
+#   - the integration (custom_components), hacs.json and the workflows must be identical in the old
+#     and the new commit of every tag (only README, CHANGELOG and tests were rewritten).
+# Remove this file after use.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # every branch and tag, so the old commits are there to compare with
+
+      - name: Check everything, then move the tags
+        run: |
+          set -euo pipefail
+          cat > tags.txt <<'LIST'
+          v0.2.0 e37e8e92f97d7e98cc753a97969bae25c614cc58
+          v0.3.0 e05fc81ec9db89c7f230c36bb09eb87bdc31e5c9
+          v0.3.1 3c1bd6b8f365a778ea9e40293e97f547e31266e1
+          v0.3.2 a31b9c36f9e31f188e5981aba9f5b7ad39e3bba8
+          v0.3.3 6b9bde350e88bcca88061707489591f2cda669e0
+          v0.4.0 808d64c6ae522b7603d84cc3c24270e3b9917c52
+          v0.5.0 4780856e5bef08b771d483f0d84a1502b284c9d9
+          v0.5.1 891bd65f197290666048fe9f09ce24decc25b01c
+          v0.6.0 8634acad3020371f41d6b6bacdb9147f57da78ac
+          v0.7.0 834ed5d406ebeb6a5cd6b8ae11c24a0f3e839fbe
+          v0.8.0 60b33dfe75e1b914e567b5355ccede4a61941077
+          v0.9.0 46cbbfd73935ea78839117c4c303022fcf3c0f17
+          v0.9.1 633c87efb00ffac4cd193214e0b2895fa07eddce
+          v0.10.0 a56c32b325fc02d0541ead809dd0df49bfc5af76
+          v0.11.0 7e052f3b3646d34606ce7bf6adbf5a3d6eba5c70
+          v0.11.1 4b8bcb5450c7f9c69b71dde66b1b789fd605bf96
+          v0.11.2 11290322d12e4d6f5051595cb8e29a6be2deb697
+          v0.11.3 5a40fdbeae5237b1ff6d9b4199a08a4d0f0027de
+          v0.11.4 262732845c953fa9460c4596b041d7e373d048c7
+          v0.11.5 f551932d4da4c2f2af9cbb46ff460a8bcbdb0062
+          v0.11.6 5c2b0c808d2d7614b65d293985a5ab3877769632
+          v0.12.0 85fa93230cfa59663fdb707024f67c41e46e99cd
+          v0.12.1 3c7e5a6cf56038e1c3f7f45e6017993452707be7
+          v0.13.0 b3e4abb6c2fb29dff916fd97dac5c7f23aef6f79
+          v0.13.1 44137939f10db548cea67e790feea97cf2bed749
+          LIST
+
+          echo "== checks (nothing is changed yet) =="
+          problems=0
+          while read -r tag sha; do
+            old="$(git rev-parse "refs/tags/${tag}^{commit}")"
+            if [ "$old" = "$sha" ]; then
+              echo "$tag: already on the new commit"
+              continue
+            fi
+            if ! git merge-base --is-ancestor "$sha" HEAD; then
+              echo "::error::$tag: $sha is not reachable from main"; problems=1; continue
+            fi
+            if ! git diff --quiet "$old" "$sha" -- custom_components hacs.json .github; then
+              echo "::error::$tag: the integration, hacs.json or the workflows differ between $old and $sha"; problems=1; continue
+            fi
+            echo "$tag: ${old:0:7} -> ${sha:0:7}  ok"
+          done < tags.txt
+          if [ "$problems" != 0 ]; then
+            echo "Stopping: nothing was changed."; exit 1
+          fi
+
+          echo "== moving the tags =="
+          refspecs=()
+          while read -r tag sha; do
+            git tag -f "$tag" "$sha" >/dev/null
+            refspecs+=("+refs/tags/${tag}:refs/tags/${tag}")
+          done < tags.txt
+          git push origin "${refspecs[@]}"
+
+          echo "== result on GitHub =="
+          while read -r tag sha; do
+            now="$(git ls-remote origin "refs/tags/${tag}" | cut -c1-40)"
+            if [ "$now" = "$sha" ]; then echo "$tag: ${now:0:7} ok"; else echo "::error::$tag is ${now:0:7}, expected ${sha:0:7}"; problems=1; fi
+          done < tags.txt
+          exit "$problems"
