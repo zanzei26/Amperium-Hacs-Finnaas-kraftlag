@@ -57,7 +57,10 @@ CONF_POWER_ENTITY = "power_entity"
 # options; off by default. Needs the "aio-pika" library, which is installed the
 # first time it is switched on.
 CONF_HAS_DOBBE = "has_dobbe"
-LIVE_REQUIREMENTS = ["aio-pika>=9.0.0"]
+# Installed the first time the live feed is switched on. Version 9.6 and 10.2 both have the calls
+# the feed uses (checked by signature, not against a real broker); a later major version has not
+# been looked at, so it is not allowed until someone has.
+LIVE_REQUIREMENTS = ["aio-pika>=9.0.0,<11"]
 # Observation ids on the feed (from the app): active power import / export.
 LIVE_OBS_IMPORT = 101
 LIVE_OBS_EXPORT = 102

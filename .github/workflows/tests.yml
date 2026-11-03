@@ -22,9 +22,9 @@ jobs:
         # 3.14 is what Home Assistant 2026.10 runs.
         python: ["3.12", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -36,6 +36,16 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      # Home Assistant installs this the first time the live feed is switched on.
+      - name: The live feed's library can be installed
+        run: |
+          python - <<'PY'
+          import subprocess, sys
+          sys.path.insert(0, "custom_components/amperium")
+          import const
+          subprocess.run([sys.executable, "-m", "pip", "install", "--dry-run", *const.LIVE_REQUIREMENTS], check=True)
+          PY
+
       - name: Tests
         run: pytest --cov=custom_components/amperium --cov-report=term
 
@@ -44,9 +54,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
           cache: pip
