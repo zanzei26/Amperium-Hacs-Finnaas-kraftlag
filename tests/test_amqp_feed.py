@@ -254,6 +254,10 @@ class _FakeQueue:
 
     async def consume(self, handler, no_ack=False, **kwargs):
         self.channel.consumed = {"handler": handler, "no_ack": no_ack}
+        consumers = getattr(getattr(self.channel, "channel", None), "consumers", None)
+        if consumers is not None:
+            consumers["ctag-1"] = handler          # as aiormq does
+        return "ctag-1"
 
 
 class _FakeChannel:
@@ -261,7 +265,7 @@ class _FakeChannel:
         import types
         self.close_callbacks = _FakeCallbacks()
         # the underlying aiormq channel, which tells us when the broker cancels a consumer
-        self.channel = types.SimpleNamespace(on_consumer_cancel_callbacks=set())
+        self.channel = types.SimpleNamespace(on_consumer_cancel_callbacks=set(), consumers={})
         self.qos = None
         self.queue_asked = None
         self.consumed = None
@@ -423,6 +427,33 @@ def test_aio_pika_glue_ends_when_the_broker_cancels_the_consumer(monkeypatch):
         assert not task.done()
         for callback in list(connection.channel_obj.channel.on_consumer_cancel_callbacks):
             callback(object())                     # Basic.Cancel frame from the broker
+        await asyncio.wait_for(task, 1)
+
+    asyncio.run(go())
+    assert connection.closed is True
+
+
+def test_aio_pika_glue_notices_a_cancelled_consumer_when_the_library_has_no_cancel_callback(monkeypatch):
+    """aio-pika 9 (aiormq 6) has no cancel callback: on a Basic.Cancel it only drops the consumer
+    from ``channel.consumers``. Found with a real RabbitMQ (tests/test_real_rabbitmq.py): the
+    listening used to go on until the feed's silence limit."""
+    import sys
+    import types
+
+    monkeypatch.setattr(amqp_feed, "CONSUMER_CHECK_SECONDS", 0.02)
+    connection = _FakeConnection()
+    del connection.channel_obj.channel.on_consumer_cancel_callbacks    # as in aiormq 6
+
+    async def fake_connect(**kwargs):
+        return connection
+
+    monkeypatch.setitem(sys.modules, "aio_pika", types.SimpleNamespace(connect=fake_connect))
+
+    async def go():
+        task = asyncio.ensure_future(amqp_feed.consume_with_aio_pika(dict(DETAILS), lambda *a: None))
+        await asyncio.sleep(0.15)                       # several checks with the consumer in place
+        assert not task.done()
+        connection.channel_obj.channel.consumers.clear()   # what aiormq 6 does on Basic.Cancel
         await asyncio.wait_for(task, 1)
 
     asyncio.run(go())
