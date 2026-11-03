@@ -56,6 +56,9 @@ RENEW_PAUSE_SECONDS = 1
 TICK_SECONDS = 30
 # How often the listening checks whether it is time to renew or the feed went quiet.
 CHECK_SECONDS = 10
+# How often the listening checks that the broker has not cancelled its consumer (see
+# ``consume_with_aio_pika``).
+CONSUMER_CHECK_SECONDS = 2.0
 
 # Every value LiveFeedState.status can have.
 LIVE_STATUSES = ("off", "starting", "connecting", "connected", "error", "unavailable")
@@ -501,10 +504,9 @@ async def consume_with_aio_pika(
         # The broker cancels the consumer when the queue is removed (for example when
         # the subscription expires). The connection and channel then stay open without
         # any error, so this must end the listening too.
-        cancel_callbacks = getattr(
-            getattr(channel, "channel", None), "on_consumer_cancel_callbacks", None
-        )
-        if cancel_callbacks is not None:
+        inner = getattr(channel, "channel", None)  # the aiormq channel under aio-pika's
+        cancel_callbacks = getattr(inner, "on_consumer_cancel_callbacks", None)
+        if cancel_callbacks is not None:  # aiormq 7 (aio-pika 10)
             cancel_callbacks.add(lambda *_: closed.set())
         await channel.set_qos(prefetch_count=20)
         queue = await channel.get_queue(details["queueName"], ensure=False)
@@ -512,8 +514,19 @@ async def consume_with_aio_pika(
         async def handler(message: Any) -> None:
             on_message(message.routing_key or "", message.body)
 
-        await queue.consume(handler, no_ack=True)
-        await closed.wait()
+        consumer_tag = await queue.consume(handler, no_ack=True)
+        # aiormq 6 (aio-pika 9) has no cancel callback: on a cancel from the broker it only
+        # drops the consumer from ``channel.consumers``, so that is checked now and then too.
+        # Without it the listening stayed on until the feed's silence limit (tested against a
+        # real RabbitMQ, tests/test_real_rabbitmq.py).
+        while True:
+            try:
+                await asyncio.wait_for(closed.wait(), timeout=CONSUMER_CHECK_SECONDS)
+                break
+            except TimeoutError:
+                consumers = getattr(inner, "consumers", None)
+                if consumers is not None and consumer_tag not in consumers:
+                    break
     finally:
         with contextlib.suppress(Exception):
             await connection.close()
