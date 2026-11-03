@@ -1,7 +1,7 @@
 """What the sensors show, from the fake API's answers all the way to the entity states.
 
-September 2026 is last month and uses invoice 3551273 (Kraft 4028.94, Nettleie 1655.30,
-Norgespris -2819.94, Totalt 2864.30, 2156.638 kWh, 1.3281 kr/kWh).
+September 2026 is last month and uses an invented invoice (Kraft 3219.50, Nettleie 1342.65,
+Norgespris -2236.80, Totalt 2325.35, 1788.520 kWh, 1.3002 kr/kWh).
 """
 from __future__ import annotations
 
@@ -19,22 +19,22 @@ def number(hass, entry, key):
 
 async def test_last_month_reproduces_the_september_invoice(hass, api):
     entry = await setup_entry(hass, make_entry(scheme="norgespris"))
-    assert number(hass, entry, "energy_last_month") == pytest.approx(2156.64, abs=0.005)
-    assert number(hass, entry, "cost_energy_last_month") == pytest.approx(4028.94, abs=0.005)   # Kraft
-    assert number(hass, entry, "grid_gross_last_month") == pytest.approx(1655.30, abs=0.005)    # Nettleie
-    assert number(hass, entry, "norgespris_last_month") == pytest.approx(2819.94, abs=0.005)
+    assert number(hass, entry, "energy_last_month") == pytest.approx(1788.52, abs=0.005)
+    assert number(hass, entry, "cost_energy_last_month") == pytest.approx(3219.50, abs=0.005)   # Kraft
+    assert number(hass, entry, "grid_gross_last_month") == pytest.approx(1342.65, abs=0.005)    # Nettleie
+    assert number(hass, entry, "norgespris_last_month") == pytest.approx(2236.80, abs=0.005)
     assert number(hass, entry, "fixed_last_month") == pytest.approx(25.0)
-    assert number(hass, entry, "subsidy_applied_last_month") == pytest.approx(1795.27, abs=0.005)
+    assert number(hass, entry, "subsidy_applied_last_month") == pytest.approx(1455.05, abs=0.005)
     # Kraft + Nettleie - Norgespris, with the fixed monthly price counted once (it is inside Kraft).
-    assert number(hass, entry, "net_cost_last_month") == pytest.approx(2864.30, abs=0.005)
-    assert number(hass, entry, "avg_price_last_month") == pytest.approx(1.3281, abs=5e-5)
+    assert number(hass, entry, "net_cost_last_month") == pytest.approx(2325.35, abs=0.005)
+    assert number(hass, entry, "avg_price_last_month") == pytest.approx(1.3002, abs=5e-5)
 
 
 async def test_last_month_for_a_customer_on_the_regular_subsidy(hass, api):
     entry = await setup_entry(hass, make_entry(scheme="subsidy"))
     # Energy + grid rent after subsidy: no Norgespris, and still no second fixed price.
-    assert number(hass, entry, "net_cost_last_month") == pytest.approx(3888.97, abs=0.005)
-    assert number(hass, entry, "avg_price_last_month") == pytest.approx(3888.97 / 2156.638, abs=5e-5)
+    assert number(hass, entry, "net_cost_last_month") == pytest.approx(3107.10, abs=0.005)
+    assert number(hass, entry, "avg_price_last_month") == pytest.approx(3107.10 / 1788.520, abs=5e-5)
 
 
 async def test_this_month_counts_the_fixed_price_once_and_gives_the_vat_on_it(hass, api):

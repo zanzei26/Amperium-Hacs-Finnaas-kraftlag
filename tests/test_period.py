@@ -29,11 +29,11 @@ class _PeriodClient:
 def test_period_helper_asks_for_both_answers_for_the_same_window_and_adds_the_scheme():
     start, end, hours, charges = _sept_inputs()
     client = _PeriodClient(hours, charges)
-    out = asyncio.run(period.async_period_summary(client, 215, start, end, OSLO, "norgespris", now=PERIOD_NOW))
+    out = asyncio.run(period.async_period_summary(client, 7001, start, end, OSLO, "norgespris", now=PERIOD_NOW))
     assert [c[0] for c in client.calls] == ["energy", "charges"]
-    assert all(c[1:] == (215, start, end) for c in client.calls)
+    assert all(c[1:] == (7001, start, end) for c in client.calls)
     assert out["scheme"] == "norgespris"
-    assert out["house_cost_norgespris"] == pytest.approx(2864.30, abs=0.005)
+    assert out["house_cost_norgespris"] == pytest.approx(2325.35, abs=0.005)
 
 
 def test_period_helper_lets_amperium_errors_through():
@@ -43,4 +43,4 @@ def test_period_helper_lets_amperium_errors_through():
 
     start, end, hours, charges = _sept_inputs()
     with pytest.raises(api.AmperiumError):
-        asyncio.run(period.async_period_summary(Failing(hours, charges), 215, start, end, OSLO))
+        asyncio.run(period.async_period_summary(Failing(hours, charges), 7001, start, end, OSLO))

@@ -57,7 +57,7 @@ async def test_an_account_with_several_sites_lets_you_choose(hass, api):
     flow = await start(hass)
     result = await through_phone_and_code(hass, flow)
     assert result["step_id"] == "site"
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_SITE_ID: "215"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_SITE_ID: "7001"})
     assert result["step_id"] == "scheme"
 
 

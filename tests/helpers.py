@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from conftest import api, derived
 
 UTC = dt.timezone.utc
-COMP = 154.12478544  # October figures from a live account (3 days)
+COMP = 118.45260713  # the subsidy (compensation) of an invented three-day period
 
 
 OSLO = ZoneInfo("Europe/Oslo")
@@ -40,20 +40,22 @@ def _hourly(start, count, *, kwh=1.0, energy=1.0, tax=0.2, norgespris=0.5):
 PERIOD_NOW = dt.datetime(2026, 10, 25, 12, 0, tzinfo=UTC)
 
 
-# Invoice 3551273 for September 2026 (Finnås Kraftlag), line by line.
-KRAFT_LINES = {"kraftpris": 3898.26, "paslag": 105.68, "fast_manedspris": 25.00, "oss_modul": 0.0}
-INVOICE = {"kraft": 4028.94, "nettleie": 1655.30, "norgespris": 2819.94, "kwh": 2156.638, "kraft_mva": 805.79, "total": 2864.30}
+# An INVENTED invoice for September 2026, line by line. Every figure here is made up; only the way
+# the lines relate to each other (Kraft holds the fixed monthly price, VAT is 20 % of the gross
+# amount, the grid rent has no fixed charge, Norgespris is deducted) follows a real invoice.
+KRAFT_LINES = {"kraftpris": 3110.40, "paslag": 84.10, "fast_manedspris": 25.00, "oss_modul": 0.0}
+INVOICE = {"kraft": 3219.50, "nettleie": 1342.65, "norgespris": 2236.80, "kwh": 1788.520, "kraft_mva": 643.90, "total": 2325.35}
 
 
 # From the API for the same month: the grid rent after subsidy. The subsidy deducted in the grid rent is
-# DERIVED from the invoice's nettleie 1655.30 - (-139.97); it is not read from the API.
-SEPT = {"energy": INVOICE["kraft"], "grid_after": -139.97, "compensation": 1655.30 + 139.97,
+# DERIVED from the invoice's nettleie 1342.65 - (-112.40); it is not read from the API.
+SEPT = {"energy": INVOICE["kraft"], "grid_after": -112.40, "compensation": 1342.65 + 112.40,
         "norgespris": INVOICE["norgespris"], "kwh": INVOICE["kwh"]}
 
 
 # September as hourly data, built from the invoice figures above.
 HOURLY_ENERGY = KRAFT_LINES["kraftpris"] + KRAFT_LINES["paslag"]       # spot price and surcharge per hour
-HOURLY_VAT = INVOICE["kraft_mva"] - 5.00                                # the API's hourly VAT (800.79)
+HOURLY_VAT = INVOICE["kraft_mva"] - 5.00                                # the API's hourly VAT (638.90)
 
 
 def _sept_inputs():
@@ -65,7 +67,7 @@ def _sept_inputs():
         # Amperium's total holds the hours AND the kraft's fixed monthly price (25) plus the grid rent after subsidy.
         "outer_total": SEPT["energy"] + SEPT["grid_after"],
         "grid": {"total": SEPT["grid_after"], "compensation": SEPT["compensation"],
-                 "capacity_amount": 525.0, "capacity_avg_kw": 10.39},
+                 "capacity_amount": 400.0, "capacity_avg_kw": 8.17},
         "fixed_total": 25.0,
     }
     return start, end, hours, charges

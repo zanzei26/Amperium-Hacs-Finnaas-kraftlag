@@ -21,15 +21,15 @@ async def test_hent_periode_for_september_matches_the_invoice(hass, api):
                      return_response=True)
     assert out["warnings"] == []
     assert out["hours_expected"] == out["hours_with_data"] == 720
-    assert out["consumption_kwh"] == pytest.approx(2156.638)
-    assert out["energy_gross"] == pytest.approx(4028.94, abs=0.005)          # Kraft
+    assert out["consumption_kwh"] == pytest.approx(1788.520)
+    assert out["energy_gross"] == pytest.approx(3219.50, abs=0.005)          # Kraft
     assert out["fixed_monthly_price"] == 25.0                                # inside Kraft
-    assert out["vat_on_energy"] == pytest.approx(805.79, abs=0.005)
-    assert out["grid_before_support"] == pytest.approx(1655.30, abs=0.005)   # Nettleie
-    assert out["capacity_charge"] == 525.0
-    assert out["norgespris_compensation"] == pytest.approx(2819.94, abs=0.005)
-    assert out["house_cost_norgespris"] == pytest.approx(2864.30, abs=0.005)  # Totalt
-    assert out["price_per_kwh_norgespris"] == pytest.approx(1.3281, abs=5e-5)
+    assert out["vat_on_energy"] == pytest.approx(643.90, abs=0.005)
+    assert out["grid_before_support"] == pytest.approx(1342.65, abs=0.005)   # Nettleie
+    assert out["capacity_charge"] == 400.0
+    assert out["norgespris_compensation"] == pytest.approx(2236.80, abs=0.005)
+    assert out["house_cost_norgespris"] == pytest.approx(2325.35, abs=0.005)  # Totalt
+    assert out["price_per_kwh_norgespris"] == pytest.approx(1.3002, abs=5e-5)
     assert "fixed_fee" not in out
 
 
@@ -49,7 +49,7 @@ async def test_hent_periode_rejects_a_period_that_ends_before_it_starts(hass, ap
 
 async def test_hent_periode_says_so_when_amperium_fails(hass, api):
     await setup_entry(hass, make_entry())
-    api.overrides["/api/sites/215/consumption/energy"] = (500, None)
+    api.overrides["/api/sites/7001/consumption/energy"] = (500, None)
     with pytest.raises(HomeAssistantError, match="Amperium"):
         await call(hass, "hent_periode", {"fra": "2026-09-01", "til": "2026-10-01"},
                    return_response=True)

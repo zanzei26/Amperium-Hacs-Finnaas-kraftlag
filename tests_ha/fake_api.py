@@ -4,8 +4,8 @@ It replaces the one method that talks HTTP (``AmperiumClient._request``) and ans
 the same JSON shapes the real API gives. Everything above that (the client's parsing, the
 coordinator, the entities) is the real code.
 
-The numbers for September 2026 are the ones on invoice 3551273 (see tests/helpers.py), so a
-test can check what a sensor shows against what the electricity company charged.
+The numbers for September 2026 are those of an invented invoice (see tests/helpers.py), so a
+test can check what a sensor shows against what that invoice says.
 """
 from __future__ import annotations
 
@@ -15,20 +15,20 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 UTC = dt.timezone.utc
-SITE_ID = 215
+SITE_ID = 7001
 SITE_NAME = "Testveien 1"
 PHONE = "+4790000000"
 
-# --- September 2026, from the invoice -----------------------------------------------------
+# --- September 2026, from the invented invoice -----------------------------------------------------
 SEPT_START = dt.datetime(2026, 8, 31, 22, tzinfo=UTC)  # 1 Sept 00:00 Europe/Oslo
 SEPT_END = dt.datetime(2026, 9, 30, 22, tzinfo=UTC)  # 1 Oct 00:00 Europe/Oslo
 SEPT_HOURS = 720
-SEPT_KWH = 2156.638
-SEPT_HOURLY_ENERGY = 3898.26 + 105.68  # kraftpris + påslag, per month
-SEPT_HOURLY_VAT = 805.79 - 5.00  # the VAT in the hours (the 5.00 on the fixed price is not in them)
-SEPT_NORGESPRIS = 2819.94
-SEPT_GRID_AFTER = -139.97
-SEPT_SUBSIDY = 1655.30 + 139.97  # derived: nettleie 1655.30 = after + subsidy
+SEPT_KWH = 1788.520
+SEPT_HOURLY_ENERGY = 3110.40 + 84.10  # kraftpris + påslag, per month
+SEPT_HOURLY_VAT = 643.90 - 5.00  # the VAT in the hours (the 5.00 on the fixed price is not in them)
+SEPT_NORGESPRIS = 2236.80
+SEPT_GRID_AFTER = -112.40
+SEPT_SUBSIDY = 1342.65 + 112.40  # derived: nettleie 1342.65 = after + subsidy
 SEPT_FIXED = 25.0
 
 # --- October 2026, up to "now" (2 October 12:30 Oslo) ---------------------------------------
@@ -182,16 +182,16 @@ class FakeAmperium:
                  "importedCompensationAmountNorgespris": SEPT_NORGESPRIS / SEPT_HOURS}
                 for h in hours
             ],
-            # Energy incl. the fixed monthly price (Kraft 4028.94) plus the grid rent after subsidy.
-            "totalAmount": 4028.94 + SEPT_GRID_AFTER,
+            # Energy incl. the fixed monthly price (Kraft 3219.50) plus the grid rent after subsidy.
+            "totalAmount": 3219.50 + SEPT_GRID_AFTER,
             "gridRent": {
                 "totalAmount": SEPT_GRID_AFTER, "compensationAmount": SEPT_SUBSIDY,
-                "capacityChargeAveragePower": 10.39,
-                "capacityInterval": {"powerMin": 10, "powerMax": 15, "amount": 525},
-                "importedEnergyDay": 1489.464, "importedEnergyNight": 667.174,
-                "energyChargeDayAmount": 660.95, "energyChargeNightAmount": 250.19,
-                "electricityFeeAmount": 192.21, "enovaFeeAmount": 26.95,
-                "membershipDiscountAmount": 0.0, "salesTaxAmount": 331.06,
+                "capacityChargeAveragePower": 8.17,
+                "capacityInterval": {"powerMin": 5, "powerMax": 10, "amount": 400},
+                "importedEnergyDay": 1236.350, "importedEnergyNight": 552.170,
+                "energyChargeDayAmount": 550.93, "energyChargeNightAmount": 210.00,
+                "electricityFeeAmount": 159.36, "enovaFeeAmount": 22.36,
+                "membershipDiscountAmount": 0.0, "salesTaxAmount": 268.53,
             },
             "fixedCharges": {"totalAmount": SEPT_FIXED},
             "capacityChargeIntervals": _CAPACITY_TIERS,

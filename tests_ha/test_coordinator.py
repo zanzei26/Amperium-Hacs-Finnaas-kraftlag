@@ -76,10 +76,10 @@ async def _consumption_rows(hass):
     await async_wait_recording_done(hass)
     rows = await get_instance(hass).async_add_executor_job(
         statistics_during_period, hass, OCT_START - dt.timedelta(days=1), NOW + dt.timedelta(days=1),
-        {"amperium:215_energy_import"}, "hour", None, {"change"},
+        {"amperium:7001_energy_import"}, "hour", None, {"change"},
     )
     return {dt.datetime.fromtimestamp(r["start"], dt.timezone.utc): r["change"]
-            for r in rows.get("amperium:215_energy_import", [])}
+            for r in rows.get("amperium:7001_energy_import", [])}
 
 
 async def test_hourly_consumption_is_imported_as_statistics_and_a_late_hour_is_filled_in(hass, api, freezer):
@@ -95,6 +95,41 @@ async def test_hourly_consumption_is_imported_as_statistics_and_a_late_hour_is_f
     assert rows[late] == 2.0                                     # picked up by the next hourly read
 
 
+async def test_advance_waits_for_the_scheduled_read_even_when_the_database_is_slow(hass, api, freezer):
+    """The hourly read runs as a background task, so ``advance`` has to wait for it explicitly.
+
+    Regression test for a flaky test: on a busy machine the helper returned while the import was
+    still in progress, and the test then read the statistics before the late hour was written.
+    Every read the import makes is slowed down here, so the helper returns early every time
+    unless it really waits: both series must have been written when it returns.
+    """
+    import time
+    from unittest.mock import patch
+
+    from custom_components.amperium import statistics as stats
+
+    real_read = stats.statistics_during_period
+    real_add = stats.async_add_external_statistics
+    written: list[str] = []
+
+    def slow_read(*args, **kwargs):
+        time.sleep(0.3)
+        return real_read(*args, **kwargs)
+
+    def add(hass_, metadata, rows):
+        written.append(metadata["statistic_id"])
+        return real_add(hass_, metadata, rows)
+
+    await setup_entry(hass, make_entry())
+    written.clear()
+    with (
+        patch.object(stats, "statistics_during_period", slow_read),
+        patch.object(stats, "async_add_external_statistics", add),
+    ):
+        await advance(hass, freezer, dt.timedelta(hours=1, minutes=1))
+        assert sorted(written) == ["amperium:7001_energy_cost", "amperium:7001_energy_import"]
+
+
 async def test_a_failing_statistics_import_does_not_stop_the_sensors(hass, api, caplog):
     from unittest.mock import patch
 
@@ -106,7 +141,7 @@ async def test_a_failing_statistics_import_does_not_stop_the_sensors(hass, api, 
 
 
 async def test_failed_prices_do_not_make_the_consumption_sensors_unavailable(hass, api):
-    api.overrides["/api/sites/215/prices"] = (500, None)
+    api.overrides["/api/sites/7001/prices"] = (500, None)
     entry = await setup_entry(hass, make_entry())
     assert entry.state is ConfigEntryState.LOADED
     assert float(value(hass, entry, "energy_month")) == 72.0
@@ -115,6 +150,6 @@ async def test_failed_prices_do_not_make_the_consumption_sensors_unavailable(has
 async def test_failed_hourly_data_keeps_the_last_good_values(hass, api, freezer):
     entry = await setup_entry(hass, make_entry())
     before = value(hass, entry, "net_cost_last_month")
-    api.overrides["/api/sites/215/consumption"] = (500, None)
+    api.overrides["/api/sites/7001/consumption"] = (500, None)
     await advance(hass, freezer, dt.timedelta(hours=1, minutes=1))
     assert value(hass, entry, "net_cost_last_month") == before

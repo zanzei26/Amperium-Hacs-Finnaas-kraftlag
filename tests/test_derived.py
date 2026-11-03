@@ -37,23 +37,23 @@ def test_consumer_price_missing_parts():
 @pytest.mark.parametrize("comp", [COMP, -COMP])
 def test_subsidy_is_sign_independent(comp):
     assert derived.subsidy_applied(comp) == pytest.approx(COMP)
-    assert derived.gross_grid_rent(328.40, comp) == pytest.approx(328.40 + COMP)
-    assert derived.net_with_norgespris(684.32, derived.subsidy_applied(comp), 244.13) == pytest.approx(
-        684.32 + COMP - 244.13
+    assert derived.gross_grid_rent(247.15, comp) == pytest.approx(247.15 + COMP)
+    assert derived.net_with_norgespris(512.40, derived.subsidy_applied(comp), 186.30) == pytest.approx(
+        512.40 + COMP - 186.30
     )
 
 
 def test_net_models_do_not_add_the_fixed_monthly_price_again():
     # Amperium's month total already holds the kraft's fixed monthly price (25 kr), so the
     # results are the total as it is, with the subsidy added back and Norgespris deducted.
-    assert derived.net_with_subsidy(684.32) == pytest.approx(684.32)
-    assert derived.net_with_norgespris(684.32, COMP, 244.13) == pytest.approx(594.31, abs=0.01)
-    assert derived.net_for_scheme("subsidy", 684.32, COMP, 244.13) == pytest.approx(684.32)
-    assert derived.net_for_scheme("norgespris", 684.32, COMP, 244.13) == pytest.approx(594.31, abs=0.01)
-    assert derived.compensation_difference(244.13, COMP) == pytest.approx(90.01, abs=0.01)
-    assert derived.net_for_scheme(None, 684.32, COMP, 244.13) is None
+    assert derived.net_with_subsidy(512.40) == pytest.approx(512.40)
+    assert derived.net_with_norgespris(512.40, COMP, 186.30) == pytest.approx(444.55, abs=0.01)
+    assert derived.net_for_scheme("subsidy", 512.40, COMP, 186.30) == pytest.approx(512.40)
+    assert derived.net_for_scheme("norgespris", 512.40, COMP, 186.30) == pytest.approx(444.55, abs=0.01)
+    assert derived.compensation_difference(186.30, COMP) == pytest.approx(67.85, abs=0.01)
+    assert derived.net_for_scheme(None, 512.40, COMP, 186.30) is None
     assert derived.net_with_subsidy(None) is None
-    assert derived.net_with_norgespris(684.32, None, 244.13) is None
+    assert derived.net_with_norgespris(512.40, None, 186.30) is None
 
 
 def test_charges_summary_has_no_subsidy_key():
@@ -199,52 +199,52 @@ def test_power_now_without_any_value():
 
 # --- before/after subsidy must add up (live figures from 3 October) -------------------
 def test_grid_before_minus_subsidy_equals_after():
-    before = derived.gross_grid_from_net(326.87, 154.12 + 5.07, 326.12)  # comp = 159.19
-    assert before == pytest.approx(326.87 + 159.19)
-    assert before == pytest.approx(486.06)
-    assert before - derived.subsidy_applied(159.19) == pytest.approx(326.87)  # = "after", exactly
+    before = derived.gross_grid_from_net(251.30, 118.45 + 3.10, 250.60)  # comp = 121.55
+    assert before == pytest.approx(251.30 + 121.55)
+    assert before == pytest.approx(372.85)
+    assert before - derived.subsidy_applied(121.55) == pytest.approx(251.30)  # = "after", exactly
 
 
 def test_grid_gross_does_not_depend_on_the_age_of_the_charges_total():
-    # charges said 326.12 an hour ago; /api/sites says 326.87 now. "After" wins.
-    assert derived.gross_grid_from_net(326.87, 159.19, 326.12) == pytest.approx(486.06)
+    # charges said 250.60 an hour ago; /api/sites says 251.30 now. "After" wins.
+    assert derived.gross_grid_from_net(251.30, 121.55, 250.60) == pytest.approx(372.85)
 
 
 def test_grid_gross_falls_back_to_charges_total_without_site_figure():
-    assert derived.gross_grid_from_net(None, 159.19, 326.12) == pytest.approx(485.31)
+    assert derived.gross_grid_from_net(None, 121.55, 250.60) == pytest.approx(372.15)
 
 
-@pytest.mark.parametrize("compensation", [159.19, -159.19])
+@pytest.mark.parametrize("compensation", [121.55, -121.55])
 def test_grid_gross_is_sign_independent(compensation):
-    assert derived.gross_grid_from_net(326.87, compensation) == pytest.approx(486.06)
+    assert derived.gross_grid_from_net(251.30, compensation) == pytest.approx(372.85)
 
 
 def test_grid_gross_unknown_without_subsidy_or_figures():
-    assert derived.gross_grid_from_net(326.87, None) is None
-    assert derived.gross_grid_from_net(None, 159.19) is None
+    assert derived.gross_grid_from_net(251.30, None) is None
+    assert derived.gross_grid_from_net(None, 121.55) is None
 
 
 def test_total_before_minus_subsidy_equals_total_after():
-    total_after, comp = 689.56, 159.19
+    total_after, comp = 530.00, 121.55
     gross = derived.gross_total_from_net(total_after, comp)
-    assert gross == pytest.approx(848.75)
+    assert gross == pytest.approx(651.55)
     assert gross - derived.subsidy_applied(comp) == pytest.approx(total_after)
 
 
 def test_total_gross_equals_energy_plus_gross_grid():
     # The energy amount holds the kraft's fixed monthly price; nothing is added for it.
-    energy, grid_after, comp = 362.69, 326.87, 159.19
+    energy, grid_after, comp = 281.40, 251.30, 121.55
     via_parts = energy + derived.gross_grid_from_net(grid_after, comp)
     assert derived.gross_total_from_net(energy + grid_after, comp) == pytest.approx(via_parts)
 
 
 def test_total_gross_unknown_when_a_part_is_missing():
-    assert derived.gross_total_from_net(689.56, None) is None
-    assert derived.gross_total_from_net(None, 159.19) is None
+    assert derived.gross_total_from_net(530.00, None) is None
+    assert derived.gross_total_from_net(None, 121.55) is None
 
 
 def test_last_month_still_uses_charges_figures():
-    assert derived.gross_grid_rent(-139.97, 100.0) == pytest.approx(-39.97)
+    assert derived.gross_grid_rent(-112.40, 100.0) == pytest.approx(-12.40)
 
 
 # --- "power now" with the Amperium live feed in between --------------------------------
@@ -331,7 +331,7 @@ def test_charges_summary_without_last_month_hours_has_no_last_month_keys():
     assert "norgespris_last_month" not in out and "energy_gross_last_month" not in out
 
 
-NETTLEIE_LINES = {"dag": 660.95, "natt": 250.19, "kapasitet": 525.00, "forbruksavgift": 192.21, "enova": 26.95}
+NETTLEIE_LINES = {"dag": 550.93, "natt": 210.00, "kapasitet": 400.00, "forbruksavgift": 159.36, "enova": 22.36}
 
 
 def test_the_invoice_lines_add_up_to_the_invoice_totals():
@@ -342,17 +342,17 @@ def test_the_invoice_lines_add_up_to_the_invoice_totals():
 
 def test_house_cost_and_price_reproduce_the_september_invoice():
     cost = derived.house_cost("norgespris", SEPT["energy"], SEPT["grid_after"], SEPT["compensation"], SEPT["norgespris"])
-    assert cost == pytest.approx(2864.30)                      # invoice: Totalt 2864,30
-    assert derived.price_per_kwh(cost, SEPT["kwh"]) == pytest.approx(1.3281, abs=5e-5)
+    assert cost == pytest.approx(2325.35)                      # the invoice's "Totalt"
+    assert derived.price_per_kwh(cost, SEPT["kwh"]) == pytest.approx(1.3002, abs=5e-5)
 
 
 def test_the_monthly_sensors_give_the_invoice_total_without_a_second_fixed_price():
     # What "net cost last month" and "total gross" now compute from the September figures.
     site_total = SEPT["energy"] + SEPT["grid_after"]                     # Amperium's total, after subsidy
     subsidy = derived.subsidy_applied(SEPT["compensation"])
-    assert derived.net_for_scheme("norgespris", site_total, subsidy, SEPT["norgespris"]) == pytest.approx(2864.30, abs=0.005)
-    assert derived.net_for_scheme("subsidy", site_total, subsidy, SEPT["norgespris"]) == pytest.approx(3888.97, abs=0.005)
-    assert derived.gross_total_from_net(site_total, SEPT["compensation"]) == pytest.approx(4028.94 + 1655.30, abs=0.005)
+    assert derived.net_for_scheme("norgespris", site_total, subsidy, SEPT["norgespris"]) == pytest.approx(2325.35, abs=0.005)
+    assert derived.net_for_scheme("subsidy", site_total, subsidy, SEPT["norgespris"]) == pytest.approx(3107.10, abs=0.005)
+    assert derived.gross_total_from_net(site_total, SEPT["compensation"]) == pytest.approx(3219.50 + 1342.65, abs=0.005)
 
 
 def test_house_cost_is_sign_independent_for_the_subsidy():
@@ -385,8 +385,8 @@ def test_price_per_kwh_zero_cost_is_a_price():
 
 # --- VAT inside the fixed monthly price ------------------------------------------------------
 def test_vat_includes_the_vat_inside_the_fixed_monthly_price():
-    # 25 kr incl. 25 % MVA holds 5.00 kr of VAT: 800.79 + 5.00 = invoice's 805.79
-    assert derived.vat_with_fixed_price(HOURLY_VAT, HOURLY_ENERGY, 25.0) == pytest.approx(805.79, abs=0.005)
+    # 25 kr incl. 25 % MVA holds 5.00 kr of VAT: 638.90 + 5.00 = invoice's 643.90
+    assert derived.vat_with_fixed_price(HOURLY_VAT, HOURLY_ENERGY, 25.0) == pytest.approx(643.90, abs=0.005)
 
 
 @pytest.mark.parametrize("vat,energy,fixed,expected", [
@@ -410,7 +410,7 @@ def test_period_end_date_is_not_included_and_dates_count_in_local_time_summer():
     assert (_iso(start), _iso(end)) == ("2026-08-31T22:00:00Z", "2026-09-30T22:00:00Z")
 
 
-def test_period_across_a_month_end_like_the_tenants_30_08_to_01_10():
+def test_period_across_a_month_end_30_08_to_01_10():
     start, end = derived.resolve_period("2026-08-30", "2026-10-01", OSLO)
     assert (_iso(start), _iso(end)) == ("2026-08-29T22:00:00Z", "2026-09-30T22:00:00Z")
     assert (end - start) == dt.timedelta(hours=32 * 24)       # 30 and 31 August + 30 days of September
@@ -459,22 +459,22 @@ def test_period_summary_for_september_matches_the_invoice_figures():
     out = derived.summarise_period(hours, charges, start, end, PERIOD_NOW, OSLO)
     assert out["warnings"] == []
     assert out["hours_expected"] == out["hours_with_data"] == 720
-    assert out["consumption_kwh"] == pytest.approx(2156.638)
-    assert out["energy_gross"] == pytest.approx(4028.94, abs=0.005)           # Kraft, from the aggregate
-    assert out["energy_gross_hourly_sum"] == pytest.approx(4003.94, abs=0.005)  # kraftpris + påslag
+    assert out["consumption_kwh"] == pytest.approx(1788.520)
+    assert out["energy_gross"] == pytest.approx(3219.50, abs=0.005)           # Kraft, from the aggregate
+    assert out["energy_gross_hourly_sum"] == pytest.approx(3194.50, abs=0.005)  # kraftpris + påslag
     assert out["fixed_monthly_price"] == pytest.approx(25.0)
     # the fixed monthly price is a part of Kraft, not an addition to it
     assert out["energy_gross"] - out["energy_gross_hourly_sum"] == pytest.approx(out["fixed_monthly_price"], abs=0.005)
-    assert out["vat_on_energy"] == pytest.approx(805.79, abs=0.005)              # invoice: Herav MVA 805,79
-    assert out["grid_after_support"] == pytest.approx(-139.97)
-    assert out["subsidy_applied"] == pytest.approx(1795.27, abs=0.005)
-    assert out["grid_before_support"] == pytest.approx(1655.30, abs=0.005)       # invoice: Nettleige
-    assert out["capacity_charge"] == pytest.approx(525.0)
-    assert out["grid_before_support_excl_capacity"] == pytest.approx(1130.30, abs=0.005)
-    assert out["norgespris_compensation"] == pytest.approx(2819.94, abs=0.005)
-    assert out["house_cost_norgespris"] == pytest.approx(2864.30, abs=0.005)     # invoice: Totalt
-    assert out["house_cost_subsidy"] == pytest.approx(4028.94 - 139.97, abs=0.005)
-    assert out["price_per_kwh_norgespris"] == pytest.approx(1.3281, abs=5e-5)
+    assert out["vat_on_energy"] == pytest.approx(643.90, abs=0.005)              # the invoice's "Herav MVA"
+    assert out["grid_after_support"] == pytest.approx(-112.40)
+    assert out["subsidy_applied"] == pytest.approx(1455.05, abs=0.005)
+    assert out["grid_before_support"] == pytest.approx(1342.65, abs=0.005)       # the invoice's "Nettleie"
+    assert out["capacity_charge"] == pytest.approx(400.0)
+    assert out["grid_before_support_excl_capacity"] == pytest.approx(942.65, abs=0.005)
+    assert out["norgespris_compensation"] == pytest.approx(2236.80, abs=0.005)
+    assert out["house_cost_norgespris"] == pytest.approx(2325.35, abs=0.005)     # the invoice's "Totalt"
+    assert out["house_cost_subsidy"] == pytest.approx(3219.50 - 112.40, abs=0.005)
+    assert out["price_per_kwh_norgespris"] == pytest.approx(1.3002, abs=5e-5)
     assert "fixed_fee" not in out and "price_per_kwh_norgespris_incl_fixed" not in out
     assert out["from"].startswith("2026-09-01T00:00:00+02:00") and out["to"].startswith("2026-10-01T00:00:00+02:00")
 

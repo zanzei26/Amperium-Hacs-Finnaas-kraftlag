@@ -63,17 +63,17 @@ def schema_for(path, method):
 
 @pytest.mark.parametrize(("path", "route", "method"), [
     ("/api/sites", "/api/sites", "get"),
-    ("/api/sites/215/prices?from=2026-10-02T00:00:00Z&to=2026-10-02T06:00:00Z",
+    ("/api/sites/7001/prices?from=2026-10-02T00:00:00Z&to=2026-10-02T06:00:00Z",
      "/api/sites/{siteId}/prices", "get"),
-    ("/api/sites/215/consumption/energy?from=2026-08-31T22:00:00Z&to=2026-09-01T03:00:00Z&resolution=H",
+    ("/api/sites/7001/consumption/energy?from=2026-08-31T22:00:00Z&to=2026-09-01T03:00:00Z&resolution=H",
      "/api/sites/{siteId}/consumption/energy", "get"),
-    ("/api/sites/215/consumption/energy?from=2026-09-30T22:00:00Z&to=2026-10-01T03:00:00Z&resolution=H",
+    ("/api/sites/7001/consumption/energy?from=2026-09-30T22:00:00Z&to=2026-10-01T03:00:00Z&resolution=H",
      "/api/sites/{siteId}/consumption/energy", "get"),
-    ("/api/sites/215/consumption/charges?from=2026-08-31T22:00:00Z&to=2026-09-01T03:00:00Z&resolution=H",
+    ("/api/sites/7001/consumption/charges?from=2026-08-31T22:00:00Z&to=2026-09-01T03:00:00Z&resolution=H",
      "/api/sites/{siteId}/consumption/charges", "get"),
-    ("/api/sites/215/consumption/charges?from=2026-09-30T22:00:00Z&to=2026-10-01T03:00:00Z&resolution=H",
+    ("/api/sites/7001/consumption/charges?from=2026-09-30T22:00:00Z&to=2026-10-01T03:00:00Z&resolution=H",
      "/api/sites/{siteId}/consumption/charges", "get"),
-    ("/api/sites/215/stream/amqp", "/api/sites/{siteId}/stream/amqp", "post"),
+    ("/api/sites/7001/stream/amqp", "/api/sites/{siteId}/stream/amqp", "post"),
     ("/api/accounts/login/refresh-token", "/api/accounts/login/refresh-token", "post"),
 ])
 def test_the_fake_answers_only_use_fields_the_api_description_has(path, route, method):

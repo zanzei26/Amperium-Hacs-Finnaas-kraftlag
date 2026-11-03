@@ -40,9 +40,9 @@ def test_summarise_prices_includes_consumer():
 def _charges_response(total, comp, outer):
     raw = {
         "energy": [], "totalAmount": outer,
-        "gridRent": {"capacityChargeAveragePower": 6.38,
+        "gridRent": {"capacityChargeAveragePower": 5.62,
                      "capacityInterval": {"powerMin": 5, "powerMax": 10, "amount": 400},
-                     "importedEnergyDay": 104.361, "importedEnergyNight": 53.725,
+                     "importedEnergyDay": 91.204, "importedEnergyNight": 47.318,
                      "compensationAmount": comp, "totalAmount": total},
         "fixedCharges": {"totalAmount": 25},
         "capacityChargeIntervals": [{"powerMin": 5, "powerMax": 10, "amount": 400},
@@ -58,18 +58,18 @@ def _charges_response(total, comp, outer):
 
 
 def test_grid_summary_capacity_and_day_night():
-    out = derived.summarise_grid(_charges_response(328.40, COMP, 684.32), "")
-    assert out["capacity_avg_kw"] == 6.38 and out["capacity_amount"] == 400
-    assert out["capacity_headroom_kw"] == pytest.approx(3.62)
+    out = derived.summarise_grid(_charges_response(247.15, COMP, 512.40), "")
+    assert out["capacity_avg_kw"] == 5.62 and out["capacity_amount"] == 400
+    assert out["capacity_headroom_kw"] == pytest.approx(4.38)
     assert out["capacity_details"]["next_tier_amount"] == 525
-    assert out["grid_energy_day_kwh"] == 104.361 and out["grid_energy_night_kwh"] == 53.725
+    assert out["grid_energy_day_kwh"] == 91.204 and out["grid_energy_night_kwh"] == 47.318
 
 
 def test_last_month_figures_come_from_charges_response():
-    out = derived.summarise_grid(_charges_response(-139.43, 1794.23, 3912.24), "_last_month")
-    assert out["cost_last_month"] == 3912.24
-    assert out["cost_grid_rent_last_month"] == -139.43
-    assert out["cost_energy_last_month"] == pytest.approx(4051.67)
+    out = derived.summarise_grid(_charges_response(-121.08, 1501.40, 3340.50), "_last_month")
+    assert out["cost_last_month"] == 3340.50
+    assert out["cost_grid_rent_last_month"] == -121.08
+    assert out["cost_energy_last_month"] == pytest.approx(3461.58)
 
 
 def test_api_has_no_norgespris_endpoint_any_more():
@@ -284,7 +284,7 @@ def test_subscription_repr_hides_the_connection_details():
 
 
 # --- live subscription call (POST /api/sites/{id}/stream/amqp) -------------------------------
-STREAM = "/api/sites/215/stream/amqp"
+STREAM = "/api/sites/7001/stream/amqp"
 
 
 def test_live_subscription_sends_what_the_app_sends_and_parses_the_answer():
@@ -294,7 +294,7 @@ def test_live_subscription_sends_what_the_app_sends_and_parses_the_answer():
         "activePowerNegative": [],
         "liveConnectionDetails": DETAILS,
     })]}, access_token="a", refresh_token="r")
-    sub = asyncio.run(client.async_create_live_subscription(215))
+    sub = asyncio.run(client.async_create_live_subscription(7001))
     body = client.bodies[0]
     assert body["includeActivePowerPositive"] is True
     assert body["includeActivePowerNegative"] is False
@@ -309,7 +309,7 @@ def test_live_subscription_sends_what_the_app_sends_and_parses_the_answer():
 def test_live_subscription_with_empty_history_is_fine():
     client = _ScriptedClient({STREAM: [(200, {"activePowerPositive": [], "activePowerNegative": [],
                                               "liveConnectionDetails": DETAILS})]})
-    assert asyncio.run(client.async_create_live_subscription(215)).import_observations == []
+    assert asyncio.run(client.async_create_live_subscription(7001)).import_observations == []
 
 
 def test_live_subscription_401_refreshes_the_token_once_and_asks_again():
@@ -318,7 +318,7 @@ def test_live_subscription_401_refreshes_the_token_once_and_asks_again():
         {STREAM: [(401, None), (200, answer)], REFRESH: [(200, {"accessToken": "n", "refreshToken": "m"})]},
         access_token="expired", refresh_token="r",
     )
-    sub = asyncio.run(client.async_create_live_subscription(215))
+    sub = asyncio.run(client.async_create_live_subscription(7001))
     assert sub.details == DETAILS
     assert [c[1] for c in client.calls] == [STREAM, REFRESH, STREAM]
     assert client.bodies[0] == client.bodies[2]          # the same request, asked again
@@ -329,7 +329,7 @@ def test_live_subscription_401_with_a_refused_refresh_is_an_auth_error():
     client = _ScriptedClient({STREAM: [(401, None)], REFRESH: [(400, {"errorCode": 7})]},
                              access_token="a", refresh_token="r")
     with pytest.raises(api.AmperiumAuthError):
-        asyncio.run(client.async_create_live_subscription(215))
+        asyncio.run(client.async_create_live_subscription(7001))
     assert [c[1] for c in client.calls] == [STREAM, REFRESH]
 
 
@@ -337,7 +337,7 @@ def test_live_subscription_server_trouble_during_a_refresh_is_not_an_auth_error(
     client = _ScriptedClient({STREAM: [(401, None)], REFRESH: [(503, None)]},
                              access_token="a", refresh_token="r")
     with pytest.raises(api.AmperiumError) as err:
-        asyncio.run(client.async_create_live_subscription(215))
+        asyncio.run(client.async_create_live_subscription(7001))
     assert not isinstance(err.value, api.AmperiumAuthError)
 
 
@@ -346,7 +346,7 @@ def test_live_subscription_server_trouble_during_a_refresh_is_not_an_auth_error(
 def test_live_subscription_bad_answers_are_errors(status, body):
     client = _ScriptedClient({STREAM: [(status, body)]})
     with pytest.raises(api.AmperiumError) as err:
-        asyncio.run(client.async_create_live_subscription(215))
+        asyncio.run(client.async_create_live_subscription(7001))
     assert not isinstance(err.value, api.AmperiumAuthError)
 
 
@@ -499,18 +499,18 @@ def test_a_network_error_always_says_what_kind_it_was(error, expected):
 
 # --- the HAN status between the main polls ----------------------------------------------------
 def test_han_status_reads_online_signal_and_the_newest_data_from_the_sites_call():
-    site = {"siteId": 215, "hanPortMeterOnline": False, "hanPortMeterSignal": 1,
+    site = {"siteId": 7001, "hanPortMeterOnline": False, "hanPortMeterSignal": 1,
             "usageForCurrentMonth": {"energyUpdatedOn": "2026-11-01T22:00:00Z", "energyImportToday": 95.9},
             "chargesForCurrentMonth": {"totalAmount": 1.0}}
     client = _ScriptedClient({"/api/sites": [(200, [{"siteId": 1}, site])]}, access_token="a", refresh_token="r")
-    out = asyncio.run(client.async_fetch_han_status(215))
+    out = asyncio.run(client.async_fetch_han_status(7001))
     assert out == {"han_online": False, "han_signal": 1, "updated": "2026-11-01T22:00:00Z"}
     assert client.paths[0].startswith("/api/sites?charges_from=")      # the call the main poll makes
 
 
 def test_han_status_works_when_amperium_leaves_the_fields_out():
-    client = _ScriptedClient({"/api/sites": [(200, [{"siteId": 215}])]})
-    assert asyncio.run(client.async_fetch_han_status(215)) == {
+    client = _ScriptedClient({"/api/sites": [(200, [{"siteId": 7001}])]})
+    assert asyncio.run(client.async_fetch_han_status(7001)) == {
         "han_online": None, "han_signal": None, "updated": None}
 
 
@@ -518,16 +518,16 @@ def test_han_status_without_sites_or_with_server_trouble_is_an_error_not_a_guess
     for script in ({"/api/sites": [(200, [])]}, {"/api/sites": [(503, None)]}):
         client = _ScriptedClient(script)
         with pytest.raises(api.AmperiumError):
-            asyncio.run(client.async_fetch_han_status(215))
+            asyncio.run(client.async_fetch_han_status(7001))
 
 
 def test_the_main_fetch_still_returns_everything_it_did():
-    site = {"siteId": 215, "siteName": "x", "hanPortMeterOnline": True, "hanPortMeterSignal": 3,
+    site = {"siteId": 7001, "siteName": "x", "hanPortMeterOnline": True, "hanPortMeterSignal": 3,
             "isProducingEnergy": False,
             "usageForCurrentMonth": {"energyImportThisMonth": 10.0, "energyUpdatedOn": "2026-11-01T22:00:00Z"},
             "chargesForCurrentMonth": {"totalAmount": 5.0, "amountEnergy": 4.0, "amountGridRent": 1.0},
             "currentEnergyPrice": {}}
     client = _ScriptedClient({"/api/sites": [(200, [site])]})
-    out = asyncio.run(client.async_fetch(215))
+    out = asyncio.run(client.async_fetch(7001))
     assert (out["energy_month"], out["cost_total"], out["han_online"], out["han_signal"], out["updated"]) == (
         10.0, 5.0, True, 3, "2026-11-01T22:00:00Z")

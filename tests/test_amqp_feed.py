@@ -102,7 +102,7 @@ def _run_feed(client, consume, *, library=True, stop_after_sleeps=1):
     async def ensure():
         return library
 
-    feed = amqp_feed.AmperiumLiveFeed(client, 215, consume=consume, ensure_library=ensure, sleep=sleep)
+    feed = amqp_feed.AmperiumLiveFeed(client, 7001, consume=consume, ensure_library=ensure, sleep=sleep)
 
     async def go():
         try:
@@ -166,7 +166,7 @@ def test_feed_backs_off_after_errors_and_gives_the_error_without_secrets(caplog)
     async def ensure():
         return True
 
-    feed = amqp_feed.AmperiumLiveFeed(client, 215, state=state, consume=consume,
+    feed = amqp_feed.AmperiumLiveFeed(client, 7001, state=state, consume=consume,
                                       ensure_library=ensure, sleep=sleep)
 
     async def go():
@@ -660,7 +660,7 @@ def _start_feed(client, consume, monkeypatch, *, wait=30.0, backoff=None):
     async def ensure():
         return True
 
-    return amqp_feed.AmperiumLiveFeed(client, 215, consume=consume, ensure_library=ensure, sleep=sleep), sleeps
+    return amqp_feed.AmperiumLiveFeed(client, 7001, consume=consume, ensure_library=ensure, sleep=sleep), sleeps
 
 
 async def _until(condition, seconds=2.0):
@@ -745,7 +745,7 @@ def test_a_reconnect_request_drops_a_working_stream_and_subscribes_again(monkeyp
 
 
 def test_a_reconnect_request_does_nothing_when_the_feed_is_not_running():
-    feed = amqp_feed.AmperiumLiveFeed(_FakeClient([]), 215)
+    feed = amqp_feed.AmperiumLiveFeed(_FakeClient([]), 7001)
     assert feed.state.status == "off" and feed.request_reconnect() is False
     feed.state.set_status("unavailable")                        # the library could not be installed
     assert feed.request_reconnect() is False
