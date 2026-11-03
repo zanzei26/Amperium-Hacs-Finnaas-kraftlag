@@ -95,7 +95,7 @@ Attributtene på sensorene og nøklene i svaret fra `amperium.hent_periode` hete
 **Eksisterende installasjon:** Home Assistant endrer ikke en entitets-ID som allerede finnes. Etter oppdateringen står sensorene med de nye navnene, men med de gamle ID-ene. Det er trygt å la det være slik. Vil du ha ID-ene i samsvar med navnene:
 
 1. Ta en sikkerhetskopi. Finn ut hva som bruker de gamle ID-ene (maler, automasjoner, skript, dashbord, intents).
-2. Kjør handlingen `amperium.oppdater_navn` under Utviklerverktøy → Handlinger. Uten argumenter **endrer den ingenting**. Den viser bare en liste med `fra`, `til` og `status` for hver sensor som er omdøpt. Eventuelt som YAML:
+2. Kjør handlingen `amperium.oppdater_navn` under Utviklerverktøy → Handlinger. Uten argumenter **endrer den ingenting**. Den viser bare en liste med `nokkel` (hvilken sensor det er), `fra`, `til` og `status` for hver sensor som er omdøpt. Eventuelt som YAML:
 
    ```yaml
    action: amperium.oppdater_navn

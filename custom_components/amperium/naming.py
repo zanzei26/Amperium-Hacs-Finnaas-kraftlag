@@ -44,7 +44,11 @@ STATUS_FAILED = "feilet"
 
 
 def plan_renames(hass: HomeAssistant, entry: ConfigEntry) -> list[dict[str, Any]]:
-    """What each renamed entity of the entry would be called, and what would happen to it."""
+    """What each renamed entity of the entry would be called, and what would happen to it.
+
+    ``nokkel`` is the sensor's key (the part of its unique id after the entry id), which says
+    which sensor an old entity id belongs to without guessing from the id.
+    """
     ent_reg = er.async_get(hass)
     dev_reg = dr.async_get(hass)
     taken = {e.entity_id for e in ent_reg.entities.values()} | set(hass.states.async_entity_ids())
@@ -52,13 +56,14 @@ def plan_renames(hass: HomeAssistant, entry: ConfigEntry) -> list[dict[str, Any]
     rows: list[dict[str, Any]] = []
     for entity in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
         unique_id = entity.unique_id or ""
-        if not unique_id.startswith(prefix) or unique_id[len(prefix):] not in RENAMED_KEYS:
+        key = unique_id[len(prefix):] if unique_id.startswith(prefix) else ""
+        if key not in RENAMED_KEYS:
             continue
         device = dev_reg.async_get(entity.device_id) if entity.device_id else None
         device_name = (device.name_by_user or device.name) if device else ""
         # The same rule Home Assistant uses for a new entity: device name + entity name.
         wanted = f"{entity.domain}.{slugify(f'{device_name} {entity.original_name or ''}'.strip())}"
-        row: dict[str, Any] = {"fra": entity.entity_id, "til": wanted}
+        row: dict[str, Any] = {"nokkel": key, "fra": entity.entity_id, "til": wanted}
         if entity.name:
             row["status"] = STATUS_OWN_NAME
         elif wanted == entity.entity_id:

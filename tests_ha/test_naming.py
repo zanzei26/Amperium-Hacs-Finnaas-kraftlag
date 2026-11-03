@@ -89,9 +89,9 @@ async def test_an_old_installation_keeps_its_ids_and_the_action_only_shows_the_p
     out = await call(hass)                                # no arguments: only show
     assert out["kun_vis"] is True
     assert out["antall_bytte"] == len(OLD)
-    plan = {row["fra"]: (row["til"], row["status"]) for row in out["endringer"]}
+    plan = {row["fra"]: (row["til"], row["status"], row["nokkel"]) for row in out["endringer"]}
     for key, old in OLD.items():
-        assert plan[old] == (NEW[key], naming.STATUS_RENAME)
+        assert plan[old] == (NEW[key], naming.STATUS_RENAME, key)   # nokkel: which sensor it is
     # Nothing was touched.
     for key, old in OLD.items():
         assert entity_id(hass, entry, key) == old
