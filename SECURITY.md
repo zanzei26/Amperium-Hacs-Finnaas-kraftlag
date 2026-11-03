@@ -2,11 +2,11 @@
 
 ## Slik melder du en sårbarhet
 
-Bruk **Report a vulnerability** under fanen *Security* i repoet. Da går meldingen privat til
-vedlikeholderen. Legg aldri tokens, telefonnummer eller adresser i åpne issues eller pull requests.
+Åpne en vanlig **Issue** i repoet og beskriv hva som er galt. Issues er åpne for alle, så legg aldri
+tokens, passord, telefonnummer eller adresser i en Issue eller en pull request.
 
-Ser du ikke den knappen, åpne en vanlig issue med teksten «trenger privat kanal» og ingen detaljer,
-så ordner vi en annen vei.
+Må du sende noe sensitivt for å vise problemet, skriv bare «trenger privat kanal» uten detaljer, så
+avtaler vi i Issue-en hvordan det kan gjøres.
 
 Det er bare den siste utgivelsen som får rettelser.
 
