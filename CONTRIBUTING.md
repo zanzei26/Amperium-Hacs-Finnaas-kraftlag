@@ -26,6 +26,7 @@ Disse kan bare settes i GitHub (ikke i koden). Settings → Branches → Add bra
 |---|---|---|
 | Lint og enhetstester | `.github/workflows/tests.yml` | hver endring, og før hver release |
 | Integrasjonen i en ekte Home Assistant (fastlåst versjon) | `tests_ha/` | hver endring, og før hver release |
+| Live-strømmen mot en ekte RabbitMQ (aio-pika nyeste og 9.6.2) | `tests/test_real_rabbitmq.py` | hver endring, og før hver release |
 | Hassfest og HACS-validering | `.github/workflows/ci.yml` | hver endring |
 | Feltene vi bruker finnes i Amperiums API-beskrivelse | `tests/test_contract.py` | hver endring |
 | Nye versjoner av actions og Python-verktøy (kommer som pull requests) | `.github/dependabot.yml` | hver mandag |
