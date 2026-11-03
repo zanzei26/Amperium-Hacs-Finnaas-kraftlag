@@ -62,8 +62,14 @@ def value(hass, entry: MockConfigEntry, key: str, platform: str = "sensor") -> s
 async def advance(hass, freezer, delta) -> None:
     """Let time pass and wait until everything that was due has finished, the recorder included.
 
-    The hourly read imports statistics through the recorder's own thread, which
-    ``async_block_till_done`` does not wait for, so that is waited for too.
+    A scheduled coordinator read runs as a *background task*, which a plain
+    ``async_block_till_done()`` does not wait for: the helper then returned while the hourly
+    import was still in progress, and a test that read the statistics straight afterwards
+    sometimes saw them before they were written (a flaky test). So background tasks are
+    waited for explicitly. That also means this helper is for entries without the live feed,
+    whose task runs for as long as the entry is loaded and would never finish.
+
+    The import writes through the recorder's own thread, so that is waited for too.
     """
     from pytest_homeassistant_custom_component.common import async_fire_time_changed
     from pytest_homeassistant_custom_component.components.recorder.common import (
@@ -72,6 +78,6 @@ async def advance(hass, freezer, delta) -> None:
 
     freezer.tick(delta)
     async_fire_time_changed(hass)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
     await async_wait_recording_done(hass)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)

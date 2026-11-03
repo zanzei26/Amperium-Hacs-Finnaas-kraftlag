@@ -126,10 +126,10 @@ Amperium-appen viser live effekt fra en egen sanntidsstrøm (RabbitMQ/AMQP). Fel
 
 ### Kostnad: brutto, støtte og netto
 
-Amperiums månedstall er lettere å misforstå enn de ser ut til. Dette er hva tallene faktisk inneholder, utledet fra en ekte konto (oktober) og kontrollert mot septemberfakturaen (nr. 0000000). **Det er ikke bekreftet av Amperium.**
+Amperiums månedstall er lettere å misforstå enn de ser ut til. Dette er hva tallene faktisk inneholder, utledet fra en ekte konto og kontrollert mot en ekte faktura (tallene er ikke publisert). **Det er ikke bekreftet av Amperium.**
 
 - **Nettleie i månedstallene er allerede etter straumstøtte.** Nettleien består av energiledd dag og natt, elavgift, Enova-avgift og **kapasitetsleddet**, minus straumstøtten. Regnestykket gikk opp på øre i en kontroll mot en ekte konto (energiledd + avgifter + kapasitetstrinn − støtte = oppgitt nettleie). Derfor kan nettleien bli negativ i en måned med mye støtte.
-- **Kraften har en fast månedspris, og den ligger allerede i Kraft-beløpet.** Hos Finnås Kraftlag er den 25 kr i måneden («Fast månedspris» under Kraft på fakturaen). Den er med i energibeløpet i månedstallene og dermed i Amperiums månedstotal, så den skal **ikke** legges til en gang til. **Nettleien har ikke noe fastledd.** Septemberfakturaen viser det: Kraft 3 219,50 = kraftpris 3 110,40 + påslag 84,10 + fast månedspris 25,00, og nettleie 1 342,65 = dag 550,93 + natt 210,00 + kapasitet 525,00 + forbruksavgift 159,36 + Enova 22,36. Timesummene («timesummert») har ikke med den faste prisen, og derfor er månedstallets energi 25 kr høyere enn timesummen. Amperium oppgir den som «fastledd» i kostnadssvaret (`fixedCharges`): 25 kr for én måned, og 50 kr er observert for 30.08–01.10, som berører to måneder. Versjonene til og med 0.12.0 kalte den «fastledd» og la den til en gang til i «Netto kostnad» (alle varianter), «Total brutto» og i handlingens `price_per_kwh_norgespris_incl_fixed`. Det ga 25 kr for mye. Modellen «fastledd kommer i tillegg» ble innført i 0.5.0 (se CHANGELOG, 0.12.1).
+- **Kraften har en fast månedspris, og den ligger allerede i Kraft-beløpet.** Hos Finnås Kraftlag er den 25 kr i måneden («Fast månedspris» under Kraft på fakturaen). Den er med i energibeløpet i månedstallene og dermed i Amperiums månedstotal, så den skal **ikke** legges til en gang til. **Nettleien har ikke noe fastledd.** En ekte faktura viser det: Kraft = kraftpris + påslag + fast månedspris, og nettleien = dag + natt + kapasitet + forbruksavgift + Enova. Timesummene («timesummert») har ikke med den faste prisen, og derfor er månedstallets energi 25 kr høyere enn timesummen. Amperium oppgir den som «fastledd» i kostnadssvaret (`fixedCharges`): 25 kr for én måned, og 50 kr er observert for 30.08–01.10, som berører to måneder. Versjonene til og med 0.12.0 kalte den «fastledd» og la den til en gang til i «Netto kostnad» (alle varianter), «Total brutto» og i handlingens `price_per_kwh_norgespris_incl_fixed`. Det ga 25 kr for mye. Modellen «fastledd kommer i tillegg» ble innført i 0.5.0 (se CHANGELOG, 0.12.1).
 - **Energi** (brutto, spot + påslag inkl. mva, pluss den faste månedsprisen) er før støtte.
 - Beløpene ser ut til å være **inkludert mva**.
 
@@ -137,7 +137,7 @@ Derfor regnes sensorene slik:
 
 - **Total brutto** = Amperiums månedstotal (etter støtte) + støtten. Det er det samme som kraft (inkl. fast månedspris) + nettleie før støtte. Tallene er bygget på samme kilde, så før − støtte = etter. Støtten hentes sjeldnere enn månedstallene og kan henge inntil én time etter.
 - **Netto med straumstøtte** = Amperiums månedstotal (som allerede er etter støtte og har den faste månedsprisen med).
-- **Netto med Norgespris** = Amperiums månedstotal + straumstøtten lagt tilbake − Norgespris-kompensasjonen. Straumstøtte gjelder ikke på Norgespris. For september gir det 3 107,10 + 1 455,05 − 2 236,80 = 2 325,35, det samme som «Totalt» i fakturaregnestykket Kraft + Nettleie + Norgespris (3 219,50 + 1 342,65 − 2 236,80).
+- **Netto med Norgespris** = Amperiums månedstotal + straumstøtten lagt tilbake − Norgespris-kompensasjonen. Straumstøtte gjelder ikke på Norgespris. På en ekte faktura (september) ga det samme tall som «Totalt» i fakturaregnestykket Kraft + Nettleie − Norgespris.
 - **Norgespris sparer** = Norgespris-kompensasjon − straumstøtten som er trukket fra nettleien (`gridRent`, det som faktisk er trukket på fakturaen). Det finnes bare ett støttetall: «Straumstøtte trukket fra nettleien denne måneden».
 
 Du velger ordningen (Norgespris eller straumstøtte) når du setter opp integrasjonen, og kan endre den under **Konfigurer**. «Netto kostnad denne måneden» bruker valgt ordning. Har du ikke valgt (eldre installasjon), er den utilgjengelig til du velger.
@@ -164,10 +164,10 @@ data:
 
 - **Fra** er med og **til er ikke med**, så 2026-09-01 til 2026-10-01 er hele september, og en periode som 2026-08-30 til 2026-10-01 går fra og med 30. august til og med 30. september. Datoer regnes som kl. 00:00 lokal tid. Du kan også oppgi dato og klokkeslett, for eksempel `"2026-09-01 06:00:00"`, og det tas da nøyaktig. Perioden kan være opptil 100 dager.
 - Svaret har blant annet `consumption_kwh`, `energy_gross`, `grid_before_support`, `subsidy_applied`, `grid_after_support`, `capacity_charge`, `fixed_monthly_price`, `vat_on_energy`, `norgespris_compensation`, `house_cost_norgespris`, `price_per_kwh_norgespris` (og `_subsidy` for straumstøtte), `hours_expected`, `hours_with_data` og `warnings`. Feltene `from` og `to` viser nøyaktig hvilket tidsrom som er regnet ut.
-- `energy_gross` er **Kraft** for perioden slik fakturaen viser den: Amperiums totalsum (energi og nettleie etter støtte) minus nettleien. Den inneholder `fixed_monthly_price`, kraftavtalens faste månedspris, som er **en del av** Kraft og ikke et tillegg. `energy_gross_hourly_sum` er summen av timene (kraftpris + påslag), så `energy_gross` = `energy_gross_hourly_sum` + `fixed_monthly_price`. `vat_on_energy` er mva på Kraft, inkl. mva på den faste prisen (septemberfakturaen: 643,90). Feltene `fixed_fee` og `price_per_kwh_norgespris_incl_fixed` fra 0.12.0 er fjernet, siden de la den faste prisen til en gang til.
+- `energy_gross` er **Kraft** for perioden slik fakturaen viser den: Amperiums totalsum (energi og nettleie etter støtte) minus nettleien. Den inneholder `fixed_monthly_price`, kraftavtalens faste månedspris, som er **en del av** Kraft og ikke et tillegg. `energy_gross_hourly_sum` er summen av timene (kraftpris + påslag), så `energy_gross` = `energy_gross_hourly_sum` + `fixed_monthly_price`. `vat_on_energy` er mva på Kraft, inkl. mva på den faste prisen. Feltene `fixed_fee` og `price_per_kwh_norgespris_incl_fixed` fra 0.12.0 er fjernet, siden de la den faste prisen til en gang til.
 - `warnings`: `period_not_over` (perioden er ikke ferdig, bare hele timer til nå er med), `hours_missing:N` (N timer mangler i svaret fra Amperium), `charge_hours_differ_from_consumption_hours`, `no_grid_rent_in_answer`, `period_spans_months`, `fixed_monthly_price_missing` (Amperium oppga ingen fast månedspris) og `fixed_monthly_price_not_in_energy_total` (totalsummen er ikke timene pluss den faste prisen, som ellers er det vanlige).
 
-**Testet mot faktura:** Handlingen for 2026-09-01 til 2026-10-01 ga i Home Assistant (v0.12.0) Kraft 1234,56, nettleie før støtte 1234,56, Norgespris-kompensasjon 2 236,80, sum 2 325,36, 1 788,520 kWh og 1,3002 kr/kWh. Faktura 0000000 har Kraft 3 219,50, nettleie 1 342,65, Norgespris −2 236,80 og totalt 2 325,35. Forskjellen er 0–2 øre. Rettelsen i 0.12.1 (den faste månedsprisen er med én gang) er kontrollert mot de samme tallene i de automatiske testene, men ikke kjørt i Home Assistant.
+**Testet mot faktura:** Handlingen for hele september ble kontrollert mot en ekte faktura i Home Assistant (v0.12.0): Kraft, nettleie før støtte, Norgespris-kompensasjon, sum, kWh og kr/kWh stemte med fakturaen innen 0–2 øre. Tallene er ikke publisert. Rettelsen i 0.12.1 (den faste månedsprisen er med én gang) er kontrollert i de automatiske testene, som bruker oppdiktede tall med samme oppbygning som fakturaen, men er ikke kjørt i Home Assistant.
 
 **Ikke avklart:** Amperiums beskrivelse av kostnadsoppgaven sier bare «total charges for a site in a given period». Den sier ikke hvordan den faste månedsprisen og kapasitetsleddet fordeles i en periode som ikke er en hel måned. Derfor oppgir handlingen dem hver for seg (`capacity_charge`, `fixed_monthly_price` og `grid_before_support_excl_capacity`) og advarer med `period_spans_months` når perioden går over et månedsskifte. For 30.08–01.10 er det observert 50 kr i fast månedspris (to måneder); kapasitetsleddet for en slik periode er ikke kontrollert mot en faktura. Kontroller tall for perioder som ikke er en hel måned mot en faktura før du bruker dem.
 
@@ -213,6 +213,8 @@ Dag/natt-forbruket for denne måneden hentes direkte fra Amperium (`gridRent.imp
 Sensoren **Spotpris nå** har attributtene `official` (om prisen er offisiell eller foreløpig), `prices_today` og `prices_tomorrow`: lister med én rad per time (`start`, `end`, `spot`, `surcharge`, `vat_percent`, `official`). Prisene for i morgen kommer rundt midten av dagen. `spot` er offisiell spotpris når den er fastsatt, ellers foreløpig pris. Hver time har også `consumer`: prisen du betaler per kWh, (spot + påslag) inkl. mva. Listene kan brukes i for eksempel ApexCharts eller automasjoner.
 
 ## Installasjon (HACS)
+
+Krever **Home Assistant 2026.10.4 eller nyere**. Det er den eneste versjonen integrasjonen er testet mot (tidligere sto det 2024.6, men det var aldri prøvd). Eldre versjoner kan virke, men er ikke undersøkt.
 
 1. HACS → ⋮ → **Egendefinerte arkiv** (Custom repositories).
 2. Lim inn URL-en til dette repoet, kategori **Integration**.
@@ -264,6 +266,10 @@ Amperium bruker passordløs OTP-innlogging i tillegg til en statisk app-nøkkel 
 `resolution` må være én bokstav (`H`, `D` eller `M`). Ord og tall avvises av API-et. Timedata hentes høyst en gang i timen.
 
 Polling hvert 15. minutt (HAN-måleren oppdateres time for time). HAN-status (online, signal, siste data) leses i tillegg hvert 5. minutt med det samme kallet som punkt 4.
+
+## Sikkerhet
+
+Hva integrasjonen lagrer, hvor den kobler til, og hvordan du melder en sårbarhet står i [SECURITY.md](SECURITY.md). Kort: telefonnummer og tokens ligger i Home Assistants lagring (ikke kryptert, som hos andre integrasjoner), og ingenting sendes til andre enn Amperium.
 
 ## Ansvarsfraskrivelse
 

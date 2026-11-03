@@ -28,6 +28,7 @@ Disse kan bare settes i GitHub (ikke i koden). Settings → Branches → Add bra
 | Integrasjonen i en ekte Home Assistant (fastlåst versjon) | `tests_ha/` | hver endring, og før hver release |
 | Hassfest og HACS-validering | `.github/workflows/ci.yml` | hver endring |
 | Feltene vi bruker finnes i Amperiums API-beskrivelse | `tests/test_contract.py` | hver endring |
+| Nye versjoner av actions og Python-verktøy (kommer som pull requests) | `.github/dependabot.yml` | hver mandag |
 | Nyeste Home Assistant, og Amperiums levende API-beskrivelse | `.github/workflows/api-drift.yml` | hver mandag |
 
 Ikke dekket: hva Amperiums API faktisk svarer (bare hva beskrivelsen sier), at tallene stemmer med en
