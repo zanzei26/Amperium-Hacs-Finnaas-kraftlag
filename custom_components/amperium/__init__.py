@@ -16,6 +16,7 @@ from .api import AmperiumAuthError, AmperiumError
 from .const import CONF_SCHEME, CONF_SITE_ID, DOMAIN, HAN_STATUS_INTERVAL
 from .coordinator import AmperiumCoordinator
 from .derived import resolve_period
+from .naming import STATUS_RENAME, apply_renames, plan_renames
 from .period import async_period_summary
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
@@ -32,7 +33,14 @@ SERVICE_PERIOD_SCHEMA = vol.Schema(
 )
 SERVICE_LIVE = "koble_til_live"
 SERVICE_LIVE_SCHEMA = vol.Schema({vol.Optional("entry_id"): cv.string})
-SERVICES = (SERVICE_PERIOD, SERVICE_LIVE)
+SERVICE_NAMES = "oppdater_navn"
+SERVICE_NAMES_SCHEMA = vol.Schema(
+    {
+        vol.Optional("kun_vis", default=True): cv.boolean,
+        vol.Optional("entry_id"): cv.string,
+    }
+)
+SERVICES = (SERVICE_PERIOD, SERVICE_LIVE, SERVICE_NAMES)
 
 
 def _selected_entry(call: ServiceCall) -> ConfigEntry:
@@ -65,6 +73,28 @@ async def _async_handle_live(call: ServiceCall) -> None:
             "Live-strømmen kjører ikke (biblioteket aio-pika mangler?). Se loggen og last "
             "integrasjonen på nytt"
         )
+
+
+async def _async_handle_names(call: ServiceCall) -> ServiceResponse:
+    """Show, or carry out, the move of old entity ids to the ids the invoice names give (0.14.0)."""
+    entry = _selected_entry(call)
+    rows = plan_renames(call.hass, entry)
+    planned = sum(1 for row in rows if row["status"] == STATUS_RENAME)
+    only_show = call.data["kun_vis"]
+    if not only_show:
+        apply_renames(call.hass, rows)
+    return {
+        "kun_vis": only_show,
+        "antall_bytte": planned,
+        "endringer": rows,
+        "merk": (
+            "Ingenting er endret. Kjør på nytt med kun_vis: false når maler, automasjoner og "
+            "dashbord er klare for de nye ID-ene."
+            if only_show
+            else "Entitets-ID-ene er endret. Maler, automasjoner og dashbord som nevner de "
+            "gamle ID-ene må bruke de nye."
+        ),
+    }
 
 
 async def _async_handle_period(call: ServiceCall) -> ServiceResponse:
@@ -119,6 +149,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmperiumConfigEntry) -> 
     if not hass.services.has_service(DOMAIN, SERVICE_LIVE):
         hass.services.async_register(
             DOMAIN, SERVICE_LIVE, _async_handle_live, schema=SERVICE_LIVE_SCHEMA
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_NAMES):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_NAMES,
+            _async_handle_names,
+            schema=SERVICE_NAMES_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
         )
     return True
 

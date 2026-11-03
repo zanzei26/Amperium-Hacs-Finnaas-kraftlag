@@ -44,7 +44,7 @@
         "title": "Dobbe-modul",
         "description": "Har du en Dobbe-modul (HAN-sensoren som sender målingene dine til Amperium)? Da kan integrasjonen hente live effekt direkte fra Amperium. Den er eksperimentell, og du kan endre valget senere under Konfigurer.",
         "data": {
-          "has_dobbe": "Jeg har en Dobbe-modul"
+          "has_dobbe": "Jeg har en Dobbe-modul (eksperimentell live-strøm)"
         }
       }
     },
@@ -73,13 +73,13 @@
         "name": "Effekt nå"
       },
       "cost_total": {
-        "name": "Total kostnad etter straumstøtte denne måneden (kraft inkl. fast månedspris + nettleie)"
+        "name": "Kraft + Nettleie etter straumstøtte denne måneden"
       },
       "cost_energy": {
-        "name": "Energikostnad brutto denne måneden"
+        "name": "Kraft denne måneden"
       },
       "cost_grid_rent": {
-        "name": "Nettleie etter straumstøtte denne måneden (inkl. kapasitetsledd)"
+        "name": "Nettleie etter straumstøtte denne måneden"
       },
       "spot_price": {
         "name": "Spotpris nå"
@@ -106,10 +106,10 @@
         "name": "Eksport i dag"
       },
       "cost_yesterday": {
-        "name": "Energikostnad brutto i går"
+        "name": "Kraftpris og påslag i går"
       },
       "norgespris_month": {
-        "name": "Norgespris-kompensasjon denne måneden"
+        "name": "Norgespris denne måneden"
       },
       "han_signal": {
         "name": "HAN-signal"
@@ -136,34 +136,34 @@
         }
       },
       "energy_gross_month": {
-        "name": "Energikostnad brutto denne måneden (timesummert)"
+        "name": "Kraftpris og påslag denne måneden (sum av timene)"
       },
       "vat_month": {
-        "name": "Mva på energi denne måneden"
+        "name": "Herav MVA på Kraft denne måneden"
       },
       "net_norgespris_month": {
-        "name": "Netto kostnad med Norgespris (inkl. fast månedspris)"
+        "name": "Totalt denne måneden med Norgespris"
       },
       "net_subsidy_month": {
-        "name": "Netto kostnad med straumstøtte (inkl. fast månedspris)"
+        "name": "Totalt denne måneden med straumstøtte"
       },
       "norgespris_saves_month": {
         "name": "Norgespris sparer denne måneden"
       },
       "cost_energy_last_month": {
-        "name": "Energikostnad brutto forrige måned"
+        "name": "Kraft forrige måned"
       },
       "cost_grid_rent_last_month": {
-        "name": "Nettleie etter straumstøtte forrige måned (inkl. kapasitetsledd)"
+        "name": "Nettleie etter straumstøtte forrige måned"
       },
       "cost_last_month": {
-        "name": "Total kostnad etter straumstøtte forrige måned (kraft inkl. fast månedspris + nettleie)"
+        "name": "Kraft + Nettleie etter straumstøtte forrige måned"
       },
       "compensation_month": {
-        "name": "Kompensasjon denne måneden (din ordning)"
+        "name": "Støtte denne måneden (Norgespris eller straumstøtte)"
       },
       "net_cost_month": {
-        "name": "Netto kostnad denne måneden (din ordning, inkl. fast månedspris)"
+        "name": "Totalt denne måneden (hittil)"
       },
       "live_power": {
         "name": "Effekt nå (live)"
@@ -172,16 +172,16 @@
         "name": "Timeeffekt denne timen (prognose)"
       },
       "grid_gross_month": {
-        "name": "Nettleie før straumstøtte denne måneden (inkl. kapasitetsledd)"
+        "name": "Nettleie før straumstøtte denne måneden"
       },
       "subsidy_applied_month": {
-        "name": "Straumstøtte trukket fra nettleien denne måneden"
+        "name": "Straumstøtte denne måneden"
       },
       "fixed_month": {
-        "name": "Fast månedspris (kraft) denne måneden"
+        "name": "Fast månedspris denne måneden"
       },
       "gross_total_month": {
-        "name": "Total brutto denne måneden (kraft inkl. fast månedspris + nettleie, før støtte)"
+        "name": "Kraft + Nettleie før støtte denne måneden"
       },
       "capacity_avg_kw": {
         "name": "Kapasitetsgrunnlag denne måneden"
@@ -214,31 +214,31 @@
         "name": "Innlogging gyldig til"
       },
       "amperium_live_power": {
-        "name": "Effekt nå (Amperium live)"
+        "name": "Effekt nå (Amperium live, eksperimentell)"
       },
       "grid_gross_last_month": {
-        "name": "Nettleie før straumstøtte forrige måned (inkl. kapasitetsledd)"
+        "name": "Nettleie før straumstøtte forrige måned"
       },
       "subsidy_applied_last_month": {
-        "name": "Straumstøtte trukket fra nettleien forrige måned"
+        "name": "Straumstøtte forrige måned"
       },
       "fixed_last_month": {
-        "name": "Fast månedspris (kraft) forrige måned"
+        "name": "Fast månedspris forrige måned"
       },
       "norgespris_last_month": {
-        "name": "Norgespris-kompensasjon forrige måned"
+        "name": "Norgespris forrige måned"
       },
       "net_cost_last_month": {
-        "name": "Netto kostnad forrige måned (din ordning, inkl. fast månedspris)"
+        "name": "Totalt forrige måned"
       },
       "avg_price_last_month": {
-        "name": "Snittpris forrige måned (din ordning, inkl. fast månedspris)"
+        "name": "Snittpris forrige måned (Totalt ÷ forbruk)"
       },
       "avg_price_month": {
-        "name": "Snittpris denne måneden (din ordning, inkl. fast månedspris)"
+        "name": "Snittpris denne måneden (Totalt ÷ forbruk)"
       },
       "amperium_live_status": {
-        "name": "Amperium live status",
+        "name": "Amperium live status (eksperimentell)",
         "state": {
           "off": "Av",
           "starting": "Starter",
@@ -271,11 +271,11 @@
           "day_end": "Dag slutter (time, 1-24)",
           "scheme": "Ordning",
           "power_entity": "Effektsensor (valgfri)",
-          "has_dobbe": "Jeg har en Dobbe-modul"
+          "has_dobbe": "Jeg har en Dobbe-modul (eksperimentell live-strøm)"
         },
         "data_description": {
           "power_entity": "Valgfri. Velg en sensor med hele husets effekt, for eksempel Tibber Pulse/Watty. Brukes til live effekt og prognose for timesnittet. En lader som Easee viser bare laderens effekt og passer ikke.",
-          "has_dobbe": "Velg dette hvis du har en Dobbe-modul (HAN-sensoren som sender målingene dine til Amperium). Da kobler integrasjonen seg til Amperiums live-strøm, den samme som appen bruker, og du får «Effekt nå (Amperium live)». Første gang installeres biblioteket aio-pika. «Effekt nå» bruker den når du ikke har en egen effektsensor, eller din er utilgjengelig. Det er ikke bekreftet at modulen leverer live-målinger; se attributtene til «Effekt nå (Amperium live)»."
+          "has_dobbe": "Velg dette hvis du har en Dobbe-modul (HAN-sensoren som sender målingene dine til Amperium). Da kobler integrasjonen seg til Amperiums live-strøm, den samme som appen bruker, og du får «Effekt nå (Amperium live, eksperimentell)». Første gang installeres biblioteket aio-pika. «Effekt nå» bruker den når du ikke har en egen effektsensor, eller din er utilgjengelig. Det er ikke bekreftet at modulen leverer live-målinger; se attributtene til «Effekt nå (Amperium live, eksperimentell)»."
         }
       }
     },
@@ -318,8 +318,22 @@
     },
     "koble_til_live": {
       "name": "Koble til live på nytt",
-      "description": "Dropper Amperiums live-strøm og abonnerer på nytt med en gang, og nullstiller ventetiden mellom forsøkene. Bruk den når «Effekt nå (Amperium live)» er utilgjengelig og du ikke vil starte Home Assistant på nytt. Har bare virkning når valget «Jeg har en Dobbe-modul» er på.",
+      "description": "Dropper Amperiums live-strøm og abonnerer på nytt med en gang, og nullstiller ventetiden mellom forsøkene. Bruk den når «Effekt nå (Amperium live, eksperimentell)» er utilgjengelig og du ikke vil starte Home Assistant på nytt. Har bare virkning når valget «Jeg har en Dobbe-modul (eksperimentell live-strøm)» er på.",
       "fields": {
+        "entry_id": {
+          "name": "Oppføring",
+          "description": "Hvilken Amperium-oppføring som brukes. Trengs bare hvis du har flere."
+        }
+      }
+    },
+    "oppdater_navn": {
+      "name": "Oppdater entitets-ID-er etter fakturaen",
+      "description": "Fra 0.14.0 har sensorene navn etter fakturaen, men en entitets-ID som allerede finnes endres ikke av seg selv. Denne handlingen gir de omdøpte sensorene den ID-en Home Assistant ville gitt dem på en ny installasjon. Som standard (kun_vis) endrer den ingenting og viser bare hva den ville gjort. Alt som nevner de gamle ID-ene (maler, automasjoner, dashbord, Energi-panelet) må oppdateres samtidig. Sensorer du selv har gitt navn, røres ikke.",
+      "fields": {
+        "kun_vis": {
+          "name": "Bare vis planen",
+          "description": "På (standard): ingenting endres, svaret viser bare hva som ville blitt endret. Av: ID-ene endres."
+        },
         "entry_id": {
           "name": "Oppføring",
           "description": "Hvilken Amperium-oppføring som brukes. Trengs bare hvis du har flere."

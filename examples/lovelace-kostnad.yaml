@@ -2,38 +2,40 @@
 # Ikke testet i Home Assistant.
 #
 # Bytt entitets-ID-ene med dine egne (Utviklerverktøy → Tilstander → søk "amperium").
-# ID-ene inneholder anleggsnavnet ditt og følger navnet sensoren hadde da den ble
-# opprettet; plassholderne under er forkortet.
+# ID-ene inneholder anleggsnavnet ditt; plassholderne under er forkortet. De følger
+# navnene fra 0.14.0, som er fakturaens ord. Har du installert integrasjonen før 0.14.0,
+# kan ID-ene dine være eldre: se README, «Navn og fakturaen» (handlingen
+# amperium.oppdater_navn viser og kan bytte dem).
 #
-# Slik henger tallene sammen (se README, «Kostnad: brutto, støtte og netto»):
-#   Total brutto = kraft (inkl. fast månedspris) + nettleie før støtte
-#   Netto        = Total brutto − kompensasjon for din ordning
+# Slik henger tallene sammen (se README, «Kostnad: før støtte, støtte og totalt»):
+#   Kraft + Nettleie før støtte = Kraft (inkl. fast månedspris) + Nettleie før straumstøtte
+#   Totalt                      = Kraft + Nettleie før støtte − støtte for din ordning
 # Amperiums egen månedstotal er allerede ETTER straumstøtte. Kraftavtalens faste
-# månedspris (25 kr) ligger i kraft-beløpet og er ikke et tillegg.
+# månedspris (25 kr) ligger i Kraft og er ikke et tillegg.
 
 type: entities
 title: Kostnad denne måneden
 state_color: true
 entities:
-  - entity: sensor.amperium_energikostnad_brutto_denne_maneden
-    name: Kraft (brutto, inkl. mva og fast månedspris)
-  - entity: sensor.amperium_fastledd_denne_maneden
-    name: Herav fast månedspris (ligger i kraft)
+  - entity: sensor.amperium_kraft_denne_maneden
+    name: Kraft (inkl. mva og fast månedspris)
+  - entity: sensor.amperium_fast_manedspris_denne_maneden
+    name: Herav fast månedspris (ligger i Kraft)
   - entity: sensor.amperium_nettleie_for_straumstotte_denne_maneden
     name: Nettleie før straumstøtte (inkl. kapasitetsledd)
   - type: divider
-  - entity: sensor.amperium_total_brutto_denne_maneden
-    name: Total brutto
+  - entity: sensor.amperium_kraft_nettleie_for_stotte_denne_maneden
+    name: Kraft + Nettleie før støtte
   - type: divider
-  - entity: sensor.amperium_kompensasjon_denne_maneden_din_ordning
-    name: − Kompensasjon (din ordning)
+  - entity: sensor.amperium_stotte_denne_maneden_norgespris_eller_straumstotte
+    name: − Støtte (din ordning)
   - type: divider
-  - entity: sensor.amperium_netto_kostnad_denne_maneden_din_ordning
-    name: Netto (ca.)
+  - entity: sensor.amperium_totalt_denne_maneden_hittil
+    name: Totalt (ca.)
   - type: divider
-  - entity: sensor.amperium_straumstotte_trukket_fra_nettleien_denne_maneden
+  - entity: sensor.amperium_straumstotte_denne_maneden
     name: Til sammenligning, straumstøtte
-  - entity: sensor.amperium_norgespris_kompensasjon_denne_maneden
+  - entity: sensor.amperium_norgespris_denne_maneden
     name: Til sammenligning, Norgespris
   - entity: sensor.amperium_norgespris_sparer_denne_maneden
     name: Norgespris sparer
@@ -47,8 +49,10 @@ entities:
     name: Til neste trinn
   - type: section
     label: Forrige måned
-  - entity: sensor.amperium_total_kostnad_etter_straumstotte_forrige_maned
-    name: Total etter støtte (kraft inkl. fast månedspris + nettleie)
+  - entity: sensor.amperium_kraft_nettleie_etter_straumstotte_forrige_maned
+    name: Kraft + Nettleie etter straumstøtte
+  - entity: sensor.amperium_totalt_forrige_maned
+    name: Totalt
   - entity: sensor.amperium_kapasitetsgrunnlag_forrige_maned
     name: Kapasitetsgrunnlag
   - entity: sensor.amperium_kapasitetsledd_forrige_maned

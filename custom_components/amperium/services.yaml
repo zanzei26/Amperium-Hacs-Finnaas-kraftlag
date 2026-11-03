@@ -23,3 +23,16 @@ koble_til_live:
       selector:
         config_entry:
           integration: amperium
+
+oppdater_navn:
+  fields:
+    kun_vis:
+      required: false
+      default: true
+      selector:
+        boolean:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: amperium

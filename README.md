@@ -21,19 +21,19 @@ Sensorer per anlegg:
 | `sensor.*_forbruk_denne_maneden` | Forbruk hittil i måneden (kWh) |
 | `sensor.*_forbruk_i_dag` | Forbruk i dag (kWh) |
 | `sensor.*_effekt_na` | Effekt nå (kW). Følger din egen effektsensor hvis du har valgt en, ellers Amperiums verdi (oppdateres en gang i timen) |
-| «Energikostnad brutto denne måneden» | Kraft hittil i måneden, brutto inkl. mva, før støtte (kr), fra månedstallene. **Inkl. den faste månedsprisen** (25 kr) |
+| «Kraft denne måneden» | Kraft hittil i måneden, brutto inkl. mva, før støtte (kr), fra månedstallene. **Inkl. den faste månedsprisen** (25 kr). Fakturaens «Kraft» |
 | «Nettleie etter straumstøtte denne måneden» | Nettleie inkl. kapasitetsledd, **etter** straumstøtte (kr). Nettleien har ikke noe fastledd |
-| «Total kostnad etter straumstøtte denne måneden» | Kraft (inkl. fast månedspris) + nettleie som over (kr). Dette er Amperiums eget månedstall |
-| «… forrige måned» (energi, nettleie, total) | De samme tre tallene for forrige måned (kr) |
+| «Kraft + Nettleie etter straumstøtte denne måneden» | Kraft (inkl. fast månedspris) + nettleie som over (kr). Dette er Amperiums eget månedstall |
+| «Kraft forrige måned», «Nettleie etter straumstøtte forrige måned», «Kraft + Nettleie etter straumstøtte forrige måned» | De samme tre tallene for forrige måned (kr) |
 | «Nettleie før straumstøtte forrige måned» | Nettleie inkl. kapasitetsledd, før støtte (kr) for forrige måned: «Nettleie etter straumstøtte» + støtten. Postene ligger som attributter |
-| «Straumstøtte trukket fra nettleien forrige måned» | Støtten som er trukket fra nettleien i månedstallene (kr). Gjelder ikke på Norgespris |
-| «Fast månedspris (kraft) forrige måned» | Kraftavtalens faste månedspris forrige måned (kr). Den er **en del av** Kraft, ikke et tillegg (eksisterende installasjoner beholder entitets-ID-en `…fastledd_forrige_maned`) |
-| «Norgespris-kompensasjon forrige måned» | Norgespris-kompensasjon forrige måned, summert fra timedata (kr) |
-| «Netto kostnad forrige måned (din ordning, inkl. fast månedspris)» | Som «Netto kostnad denne måneden», men for forrige måned (kr) |
-| «Snittpris forrige måned» / «Snittpris denne måneden» (kr/kWh) | Husets snittpris for ordningen du har valgt. Den faste månedsprisen er med, fordi den ligger i Kraft. Se «Strømregnskap» |
+| «Straumstøtte forrige måned» | Støtten som er trukket fra nettleien i månedstallene (kr). Gjelder ikke på Norgespris |
+| «Fast månedspris forrige måned» | Kraftavtalens faste månedspris forrige måned (kr). Den er **en del av** Kraft, ikke et tillegg (se «Navn og fakturaen» om entitets-ID-ene) |
+| «Norgespris forrige måned» | Norgespris-kompensasjon forrige måned, summert fra timedata (kr) |
+| «Totalt forrige måned» | Som «Totalt denne måneden (hittil)», men for forrige måned (kr). Ordningen du har valgt, den faste månedsprisen er med én gang |
+| «Snittpris forrige måned (Totalt ÷ forbruk)» / «Snittpris denne måneden (Totalt ÷ forbruk)» (kr/kWh) | Husets snittpris for ordningen du har valgt. Den faste månedsprisen er med, fordi den ligger i Kraft. Se «Strømregnskap» |
 | «Nettleie før straumstøtte denne måneden» | Nettleie inkl. kapasitetsledd, før støtte (kr): «Nettleie etter straumstøtte» + støtten, så før − støtte = etter. Postene ligger som attributter (fra kostnadssvaret, kan avvike noen øre) |
-| «Fast månedspris (kraft) denne måneden» | Kraftavtalens faste månedspris (kr). Den er **allerede med** i Kraft og i månedstallene over, ikke et tillegg (eksisterende installasjoner beholder entitets-ID-en `…fastledd_denne_maneden`) |
-| «Total brutto denne måneden» | Kraft (inkl. fast månedspris) + nettleie, før støtte (kr): «Total kostnad etter straumstøtte» + støtten |
+| «Fast månedspris denne måneden» | Kraftavtalens faste månedspris (kr). Den er **allerede med** i Kraft og i månedstallene over, ikke et tillegg (se «Navn og fakturaen» om entitets-ID-ene) |
+| «Kraft + Nettleie før støtte denne måneden» | Kraft (inkl. fast månedspris) + nettleie, før støtte (kr): «Total kostnad etter straumstøtte» + støtten |
 | «Kapasitetsgrunnlag denne måneden» (kW) | Effekten kapasitetsleddet beregnes av, med trinnet og trinntabellen som attributter |
 | «Kapasitetsleddet denne måneden» (kr) og «Til neste kapasitetstrinn» (kW) | Beløpet for trinnet du er i, og hvor mange kW det er til neste trinn. Samme for forrige måned |
 | `sensor.*_spotpris_na` | Spotpris nå (kr/kWh), uten mva og påslag. Offisiell pris når den er fastsatt, ellers prisen for gjeldende time fra timelisten (foreløpig). Attributtet `official` viser hvilken |
@@ -45,14 +45,14 @@ Sensorer per anlegg:
 | `sensor.*_forbruk_siste_time` | Forbruk siste hele time (kWh) |
 | `sensor.*_forbruk_forrige_maned` | Forbruk forrige måned (kWh) |
 | `sensor.*_forbruk_dag_denne_maneden` / `..._natt_...` | Forbruk dag og natt hittil i måneden (kWh), se «Dag og natt» |
-| `sensor.*_energikostnad_brutto_i_gar` | Brutto energikostnad i går (kr): (spot + påslag) × kWh inkl. mva, før støtte |
-| `sensor.*_energikostnad_brutto_denne_maneden_timesummert` | Brutto energikostnad hittil i måneden (kr), summert fra timedata. Har **ikke** med den faste månedsprisen, så den ligger 25 kr under «Energikostnad brutto denne måneden» når timene er à jour |
-| `sensor.*_mva_pa_energi_denne_maneden` | Mva-delen av energikostnaden hittil i måneden (kr), inkl. mva på den faste månedsprisen |
-| «Straumstøtte trukket fra nettleien denne måneden» | Straumstøtten slik den er trukket fra nettleien (kr) |
-| «Norgespris-kompensasjon denne måneden» | Norgespris-kompensasjon summert fra timedata (kr) |
-| «Kompensasjon denne måneden (din ordning)» | Beløpet for ordningen du har valgt (kr) |
-| «Netto kostnad denne måneden (din ordning)» | Total kostnad for ordningen du har valgt (kr). Den faste månedsprisen er med, én gang. Se «Kostnad: brutto, støtte og netto» |
-| «Netto kostnad med Norgespris» / «… med straumstøtte» | Netto for hver ordning, avslått som standard |
+| «Kraftpris og påslag i går» | Kraftpris og påslag i går (kr): (spot + påslag) × kWh inkl. mva, før støtte |
+| «Kraftpris og påslag denne måneden (sum av timene)» | Kraftpris og påslag hittil i måneden (kr), summert fra timedata. Har **ikke** med den faste månedsprisen, så den ligger 25 kr under «Kraft denne måneden» når timene er à jour |
+| «Herav MVA på Kraft denne måneden» | Mva-delen av Kraft hittil i måneden (kr), inkl. mva på den faste månedsprisen |
+| «Straumstøtte denne måneden» | Straumstøtten slik den er trukket fra nettleien (kr) |
+| «Norgespris denne måneden» | Norgespris-kompensasjon summert fra timedata (kr) |
+| «Støtte denne måneden (Norgespris eller straumstøtte)» | Beløpet for ordningen du har valgt (kr) |
+| «Totalt denne måneden (hittil)» | Totalt for ordningen du har valgt (kr). Den faste månedsprisen er med, én gang. Se «Kostnad: før støtte, støtte og totalt» |
+| «Totalt denne måneden med Norgespris» / «Totalt denne måneden med straumstøtte» | Totalt for hver ordning, avslått som standard |
 | «Norgespris sparer denne måneden» | Hvor mye mer Norgespris gir enn straumstøtte hittil i måneden (kr) |
 | `sensor.*_eksport_*` | Eksport (solceller), avslått som standard. Slå på hvis du produserer strøm |
 | `sensor.*_han_signal` | HAN-signalstyrke (diagnostikk) |
@@ -64,6 +64,49 @@ Sensorer per anlegg:
 | «Innlogging fornyes» | Når gjeldende tilgangstoken utløper og fornyes automatisk (diagnostikk). Flytter seg 5 døgn fram ved hver fornyelse |
 
 Sensorene nullstilles daglig/månedlig, så de passer best som egne dashbordkort (se [`examples/lovelace-amperium.yaml`](examples/lovelace-amperium.yaml)).
+
+### Navn og fakturaen (fra 0.14.0)
+
+Fra 0.14.0 heter sensorene det fakturaen kaller postene: **Kraft**, **Fast månedspris** (en del av Kraft), **Nettleie** (før og etter straumstøtte), **Straumstøtte**, **Norgespris** og **Totalt**. Slik kan du lese et tall i Home Assistant og finne samme post på fakturaen.
+
+| Fakturaen | Sensor denne måneden | Sensor forrige måned | Nøkkel i svaret fra `amperium.hent_periode` |
+|---|---|---|---|
+| Kraft (inkl. fast månedspris) | Kraft denne måneden | Kraft forrige måned | `energy_gross` |
+| – herav Fast månedspris | Fast månedspris denne måneden | Fast månedspris forrige måned | `fixed_monthly_price` |
+| – herav MVA på Kraft | Herav MVA på Kraft denne måneden | | `vat_on_energy` |
+| Kraftpris og påslag (uten fast månedspris) | Kraftpris og påslag denne måneden (sum av timene), Kraftpris og påslag i går | | `energy_gross_hourly_sum` |
+| Nettleie før straumstøtte | Nettleie før straumstøtte denne måneden | Nettleie før straumstøtte forrige måned | `grid_before_support` |
+| Straumstøtte | Straumstøtte denne måneden | Straumstøtte forrige måned | `subsidy_applied` |
+| Nettleie etter straumstøtte | Nettleie etter straumstøtte denne måneden | Nettleie etter straumstøtte forrige måned | `grid_after_support` |
+| Kapasitetsledd | Kapasitetsledd denne måneden | Kapasitetsledd forrige måned | `capacity_charge` |
+| Norgespris | Norgespris denne måneden | Norgespris forrige måned | `norgespris_compensation` |
+| Støtte (Norgespris eller straumstøtte, det du har valgt) | Støtte denne måneden (Norgespris eller straumstøtte) | | |
+| Kraft + Nettleie før støtte | Kraft + Nettleie før støtte denne måneden | | |
+| Kraft + Nettleie etter straumstøtte | Kraft + Nettleie etter straumstøtte denne måneden | Kraft + Nettleie etter straumstøtte forrige måned | |
+| Totalt (ordningen du har valgt) | Totalt denne måneden (hittil) | Totalt forrige måned | |
+| Totalt med Norgespris | Totalt denne måneden med Norgespris | | `house_cost_norgespris` |
+| Totalt med straumstøtte | Totalt denne måneden med straumstøtte | | `house_cost_subsidy` |
+| Snittpris per kWh | Snittpris denne måneden (Totalt ÷ forbruk) | Snittpris forrige måned (Totalt ÷ forbruk) | `price_per_kwh_norgespris`, `price_per_kwh_subsidy` |
+
+Attributtene på sensorene og nøklene i svaret fra `amperium.hent_periode` heter det de alltid har gjort (engelske nøkler som `energy_gross` og `fixed_monthly_price`). De er **ikke** endret, så maler og automasjoner som bruker dem virker som før. Tabellen over viser hvilken fakturapost hver nøkkel hører til.
+
+**Ny installasjon:** entitets-ID-ene lages av de nye navnene, for eksempel `sensor.amperium_<anlegg>_kraft_denne_maneden`.
+
+**Eksisterende installasjon:** Home Assistant endrer ikke en entitets-ID som allerede finnes. Etter oppdateringen står sensorene med de nye navnene, men med de gamle ID-ene. Det er trygt å la det være slik. Vil du ha ID-ene i samsvar med navnene:
+
+1. Ta en sikkerhetskopi. Finn ut hva som bruker de gamle ID-ene (maler, automasjoner, skript, dashbord, intents).
+2. Kjør handlingen `amperium.oppdater_navn` under Utviklerverktøy → Handlinger. Uten argumenter **endrer den ingenting**. Den viser bare en liste med `fra`, `til` og `status` for hver sensor som er omdøpt. Eventuelt som YAML:
+
+   ```yaml
+   action: amperium.oppdater_navn
+   data:
+     kun_vis: true
+   ```
+
+3. Oppdater alt som bruker de gamle ID-ene, i takt med listen fra punkt 2.
+4. Kjør handlingen med `kun_vis: false`. Da endres ID-ene. Handlingen er trygg å kjøre flere ganger: det som allerede har riktig ID står som `uendret`.
+
+Statusene i listen: `bytte` (blir endret), `byttet` (er endret), `uendret` (har allerede ID-en), `finnes_allerede` (en annen entitet har den ID-en, så sensoren røres ikke), `eget_navn` (du har selv gitt sensoren navn, så den røres ikke) og `feilet`. Unike ID-er (`unique_id`) endres ikke, så Home Assistant skal flytte historikken til den nye ID-en. **Det er ikke kontrollert i en ekte installasjon ennå**, så se etter at grafene henger sammen etter at du har kjørt handlingen. Energidashbordet bruker statistikk med egne ID-er (`amperium:…`) og ikke disse sensorene, og berøres ikke av det.
 
 ### Energidashbordet
 
@@ -99,20 +142,20 @@ Velg en sensor som måler **hele huset**. En lader som Easee viser bare laderens
 
 ### Live effekt fra Amperium (Dobbe-modul, eksperimentell)
 
-Amperium-appen viser live effekt fra en egen sanntidsstrøm (RabbitMQ/AMQP). Feltet «Effekt nå» fra vanlig henting oppdateres bare én gang i timen og kan stå på 0. Har du en **Dobbe-modul** (HAN-sensoren som sender målingene dine til Amperium), velger du det ved oppsett eller senere under **Konfigurer** («Jeg har en Dobbe-modul»). Svaret er **nei** som standard, også for eksisterende installasjoner. Svarer du ja, kobler integrasjonen seg til den samme strømmen som appen bruker, og du får sensoren **Effekt nå (Amperium live)**. Første gang installeres biblioteket `aio-pika`. Mislykkes det, er bare denne funksjonen av. Svarer du nei, skjer ingenting av dette.
+Amperium-appen viser live effekt fra en egen sanntidsstrøm (RabbitMQ/AMQP). Feltet «Effekt nå» fra vanlig henting oppdateres bare én gang i timen og kan stå på 0. Har du en **Dobbe-modul** (HAN-sensoren som sender målingene dine til Amperium), velger du det ved oppsett eller senere under **Konfigurer** («Jeg har en Dobbe-modul (eksperimentell live-strøm)»). Svaret er **nei** som standard, også for eksisterende installasjoner. Svarer du ja, kobler integrasjonen seg til den samme strømmen som appen bruker, og du får sensoren **Effekt nå (Amperium live, eksperimentell)**. Første gang installeres biblioteket `aio-pika`. Mislykkes det, er bare denne funksjonen av. Svarer du nei, skjer ingenting av dette.
 
 «Effekt nå» bruker denne rekkefølgen: **din egen effektsensor** (se over), så **Amperium live** (siste måling må være under to minutter gammel), så Amperiums timeverdi. Attributtet `source` viser hva som er brukt (`local_sensor`, `amperium_live` eller `amperium`).
 
-**Bekreftet i tester 3. oktober 2026, ikke over lang tid.** Meldingsformatet er lest fra appens kode. Tester i en ekte Home Assistant (én konto med Dobbe-modul) viste status `connected`, omtrent én måling hvert annet sekund, og verdier identiske med en lokal Tibber Pulse (samme verdi, bare ulik enhet). Enheten fra Amperium er watt. I en overvåking på 15 minutter kom det meldinger uten opphold gjennom flere fornyelser av abonnementet (hvert 4. minutt). Det vanlige HTTP-kallet alene gir en tom liste, så live kommer bare via strømmen. Se attributtene på «Effekt nå (Amperium live)»: `status` (`connecting`, `connected`, `error`, `unavailable`), `messages` (antall mottatt), `age_seconds`, `last_error` (bare mens det er et problem) og `last_error_at`. Står den på `connected` mens `messages` forblir 0, leverer måleren ikke live-målinger til Amperium akkurat nå. Et svakt mobilsignal på HAN-modulen (se «HAN-signalkvalitet») kan være årsaken, men det er ikke bekreftet. Meld fra under Issues hva du ser, særlig hvis du ikke har Dobbe-modul, eller hvis forbindelsen faller ut over tid.
+**Bekreftet i tester 3. oktober 2026, ikke over lang tid.** Meldingsformatet er lest fra appens kode. Tester i en ekte Home Assistant (én konto med Dobbe-modul) viste status `connected`, omtrent én måling hvert annet sekund, og verdier identiske med en lokal Tibber Pulse (samme verdi, bare ulik enhet). Enheten fra Amperium er watt. I en overvåking på 15 minutter kom det meldinger uten opphold gjennom flere fornyelser av abonnementet (hvert 4. minutt). Det vanlige HTTP-kallet alene gir en tom liste, så live kommer bare via strømmen. Se attributtene på «Effekt nå (Amperium live, eksperimentell)»: `status` (`connecting`, `connected`, `error`, `unavailable`), `messages` (antall mottatt), `age_seconds`, `last_error` (bare mens det er et problem) og `last_error_at`. Står den på `connected` mens `messages` forblir 0, leverer måleren ikke live-målinger til Amperium akkurat nå. Et svakt mobilsignal på HAN-modulen (se «HAN-signalkvalitet») kan være årsaken, men det er ikke bekreftet. Meld fra under Issues hva du ser, særlig hvis du ikke har Dobbe-modul, eller hvis forbindelsen faller ut over tid.
 
 #### Når live-strømmen svikter (fra 0.13.0)
 
 - **Nytt abonnement for hvert forsøk.** Hvert forsøk ber Amperium om nye tilkoblingsopplysninger, og opplysninger fra et tidligere forsøk brukes aldri om igjen. Er tilgangstokenet utløpt, fornyes det først (som ved alle andre kall) og kallet gjentas én gang.
 - **Ventetid mellom forsøk** øker ved feil fra 5 sekunder til 10 minutter og blir der, og starter på nytt når målinger kommer igjen. Ender strømmen bare eller er den stille (måleren sender ikke), går ventetiden aldri over 5 minutter.
 - **Loggen** får én advarsel når et problem begynner (og en ny hvis feilteksten endrer seg) og én melding «working again» når det virker igjen. Ikke en linje per forsøk. Står det «(same connection details as the attempt before)» i feilen, ga Amperium de samme opplysningene to ganger på rad etter en avvisning.
-- **Utilgjengelig.** Uten måling i 15 minutter blir «Effekt nå (Amperium live)» **utilgjengelig** (før det er den ukjent), så en overvåkingsregel i Home Assistant kan fange det. Home Assistant skjuler attributtene til en utilgjengelig sensor. Derfor finnes samme informasjon på diagnostikksensoren **Amperium live status** (tilstand: `off`, `starting`, `connecting`, `connected`, `error` eller `unavailable`), som alltid er tilgjengelig. Attributtene `feil` (siste feiltekst, tom når det virker) og `siste_melding` (når siste måling kom) ligger på begge sensorene, i tillegg til `status`, `messages` og de andre som fantes fra før. Status-sensoren skrives ved endringer og ellers høyst én gang i minuttet.
-- **Handlingen `amperium.koble_til_live`** dropper strømmen og abonnerer på nytt med en gang, med ventetiden nullstilt, uten å starte Home Assistant på nytt. Den kan brukes fra en automasjon, for eksempel når «Amperium live status» har stått på `error` i en halvtime. Den feiler med en forklaring hvis valget «Jeg har en Dobbe-modul» er av.
-- **Slå live-strømmen av:** fjern «Jeg har en Dobbe-modul» under Konfigurer. Vanlig «Effekt nå» (per time) og alt annet er upåvirket.
+- **Utilgjengelig.** Uten måling i 15 minutter blir «Effekt nå (Amperium live, eksperimentell)» **utilgjengelig** (før det er den ukjent), så en overvåkingsregel i Home Assistant kan fange det. Home Assistant skjuler attributtene til en utilgjengelig sensor. Derfor finnes samme informasjon på diagnostikksensoren **Amperium live status (eksperimentell)** (tilstand: `off`, `starting`, `connecting`, `connected`, `error` eller `unavailable`), som alltid er tilgjengelig. Attributtene `feil` (siste feiltekst, tom når det virker) og `siste_melding` (når siste måling kom) ligger på begge sensorene, i tillegg til `status`, `messages` og de andre som fantes fra før. Status-sensoren skrives ved endringer og ellers høyst én gang i minuttet.
+- **Handlingen `amperium.koble_til_live`** dropper strømmen og abonnerer på nytt med en gang, med ventetiden nullstilt, uten å starte Home Assistant på nytt. Den kan brukes fra en automasjon, for eksempel når «Amperium live status (eksperimentell)» har stått på `error` i en halvtime. Den feiler med en forklaring hvis valget «Jeg har en Dobbe-modul (eksperimentell live-strøm)» er av.
+- **Slå live-strømmen av:** fjern «Jeg har en Dobbe-modul (eksperimentell live-strøm)» under Konfigurer. Vanlig «Effekt nå» (per time) og alt annet er upåvirket.
 
 **Ikke avklart:** Over to døgn var sensoren ukjent i flere perioder (nesten en tredel av tiden) i Home Assistant. Loggen viste «Network error» med 5,5 minutters mellomrom. Det passer med tidsavbruddet på 30 sekunder pluss ventetiden på 300 sekunder, så kallet som oppretter abonnementet ser ut til å ha fått tidsavbrudd (utledet, ikke målt direkte). Det er også rapportert ACCESS_REFUSED fra meldingskøen en gang (ikke kontrollert, loggen fra da er borte). Årsaken er ikke funnet, og den er ikke at gamle opplysninger gjenbrukes: det gjorde ikke koden før 0.13.0 heller. Integrasjonen kan ikke gjøre noe med at Amperium ikke svarer, bare vente og prøve igjen uten å fylle loggen. Utholdenheten over tid er ikke målt etter 0.13.0.
 
@@ -124,7 +167,7 @@ Amperium-appen viser live effekt fra en egen sanntidsstrøm (RabbitMQ/AMQP). Fel
 - **Hull i timedata.** Hele måneden hentes på nytt hver time, og statistikken for Energidashbordet skrives om hver gang. En time som Amperium leverer i ettertid kommer derfor med av seg selv, og det er ikke noe mer å fylle inn herfra. Er en time aldri levert, finnes det heller ikke noe tall å vise, og integrasjonen finner ikke på noe. «Forbruk denne måneden» og de andre månedstallene fra Amperium er da for lave med dette forbruket. «Manglende timer denne måneden» teller hullene (inne i dataene, de to nyeste timene regnes ikke med), og loggen (nivå info) sier fra når timer mangler og når de kommer. En gang manglet to timer i Amperiums data selv flere timer etterpå, uten at det ble forklart.
 - Vil du varsles om at HAN-måleren har vært borte lenge, bruk «HAN-måler online» med `for:`, eller `now() - states('sensor.…han_siste_data')` større enn 90 minutter.
 
-### Kostnad: brutto, støtte og netto
+### Kostnad: før støtte, støtte og totalt
 
 Amperiums månedstall er lettere å misforstå enn de ser ut til. Dette er hva tallene faktisk inneholder, utledet fra en ekte konto og kontrollert mot en ekte faktura (tallene er ikke publisert). **Det er ikke bekreftet av Amperium.**
 
@@ -135,12 +178,12 @@ Amperiums månedstall er lettere å misforstå enn de ser ut til. Dette er hva t
 
 Derfor regnes sensorene slik:
 
-- **Total brutto** = Amperiums månedstotal (etter støtte) + støtten. Det er det samme som kraft (inkl. fast månedspris) + nettleie før støtte. Tallene er bygget på samme kilde, så før − støtte = etter. Støtten hentes sjeldnere enn månedstallene og kan henge inntil én time etter.
-- **Netto med straumstøtte** = Amperiums månedstotal (som allerede er etter støtte og har den faste månedsprisen med).
-- **Netto med Norgespris** = Amperiums månedstotal + straumstøtten lagt tilbake − Norgespris-kompensasjonen. Straumstøtte gjelder ikke på Norgespris. På en ekte faktura (september) ga det samme tall som «Totalt» i fakturaregnestykket Kraft + Nettleie − Norgespris.
-- **Norgespris sparer** = Norgespris-kompensasjon − straumstøtten som er trukket fra nettleien (`gridRent`, det som faktisk er trukket på fakturaen). Det finnes bare ett støttetall: «Straumstøtte trukket fra nettleien denne måneden».
+- **Kraft + Nettleie før støtte** = Amperiums månedstotal (etter støtte) + støtten. Det er det samme som kraft (inkl. fast månedspris) + nettleie før støtte. Tallene er bygget på samme kilde, så før − støtte = etter. Støtten hentes sjeldnere enn månedstallene og kan henge inntil én time etter.
+- **Totalt med straumstøtte** = Amperiums månedstotal (som allerede er etter støtte og har den faste månedsprisen med).
+- **Totalt med Norgespris** = Amperiums månedstotal + straumstøtten lagt tilbake − Norgespris-kompensasjonen. Straumstøtte gjelder ikke på Norgespris. På en ekte faktura (september) ga det samme tall som «Totalt» i fakturaregnestykket Kraft + Nettleie − Norgespris.
+- **Norgespris sparer** = Norgespris-kompensasjon − straumstøtten som er trukket fra nettleien (`gridRent`, det som faktisk er trukket på fakturaen). Det finnes bare ett støttetall: «Straumstøtte denne måneden».
 
-Du velger ordningen (Norgespris eller straumstøtte) når du setter opp integrasjonen, og kan endre den under **Konfigurer**. «Netto kostnad denne måneden» bruker valgt ordning. Har du ikke valgt (eldre installasjon), er den utilgjengelig til du velger.
+Du velger ordningen (Norgespris eller straumstøtte) når du setter opp integrasjonen, og kan endre den under **Konfigurer**. «Totalt denne måneden (hittil)» bruker valgt ordning. Har du ikke valgt (eldre installasjon), er den utilgjengelig til du velger.
 
 Støtten leses uten hensyn til fortegn (den er alltid et fradrag). Tallene for **forrige måned** hentes fra samme kostnadssvar: nettleie etter støtte er `gridRent.totalAmount`, total er svarets `totalAmount`, og energi er differansen (avledet). Tallene er **omtrentlige**: kompensasjon og energi summeres fra hele timer, mens månedstallene kan ligge noen timer foran eller bak. Bruk dem som peiling, ikke som faktura. Eksempelkortet [`examples/lovelace-kostnad.yaml`](examples/lovelace-kostnad.yaml) viser oppsettet.
 

@@ -5,7 +5,8 @@
 # Integrasjonen samler alt under én enhet "Amperium – <anlegget ditt>", og
 # entitets-ID-ene inkluderer anleggsnavnet, f.eks.:
 #   sensor.amperium_<anleggsnavn>_forbruk_denne_maneden
-# ID-ene under er KORTE plassholdere. Bytt dem med dine egne:
+# ID-ene under er KORTE plassholdere (navnene fra 0.14.0, se README «Navn og fakturaen»).
+# Bytt dem med dine egne:
 #   Utviklerverktøy → Tilstander → søk "amperium"
 # eller bygg kortene i UI-editoren og velg entitetene fra lista.
 #
@@ -46,13 +47,13 @@ views:
         title: Kostnad hittil i måneden
         state_color: true
         entities:
-          - entity: sensor.amperium_kostnad_denne_maneden
-            name: Total kostnad
+          - entity: sensor.amperium_kraft_nettleie_etter_straumstotte_denne_maneden
+            name: Kraft + Nettleie etter straumstøtte
           - type: divider
-          - entity: sensor.amperium_energikostnad_denne_maneden
-            name: Energi
-          - entity: sensor.amperium_nettleie_denne_maneden
-            name: Nettleie
+          - entity: sensor.amperium_kraft_denne_maneden
+            name: Kraft
+          - entity: sensor.amperium_nettleie_etter_straumstotte_denne_maneden
+            name: Nettleie etter straumstøtte
           - type: divider
           - entity: sensor.amperium_forbruk_denne_maneden
             name: Forbruk denne måneden
@@ -66,7 +67,7 @@ views:
         stat_types:
           - state
         entities:
-          - sensor.amperium_kostnad_denne_maneden
+          - sensor.amperium_kraft_nettleie_etter_straumstotte_denne_maneden
 
       - type: history-graph
         title: Effekt siste døgn

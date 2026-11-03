@@ -7,13 +7,13 @@ Strømforbruk, kostnad og pris **direkte fra Finnås Kraftlag** via Amperium-pla
 ## Sensorer
 - Forbruk denne måneden / i dag (kWh)
 - Effekt nå (kW), fra din egen effektsensor hvis du velger en
-- Total kostnad, energikostnad og nettleie hittil i måneden (kr)
+- Kraft, Nettleie og Totalt hittil i måneden (kr), med samme ord som på fakturaen
 - Offisiell spotpris nå (kr/kWh)
 - Laveste, høyeste og gjennomsnittlig timepris i dag (kr/kWh)
 - Timepriser for i dag og i morgen som attributter på spotpris-sensoren
 - Forbruk i går, siste time og forrige måned, dag/natt-fordeling, energikostnad i går
 - Straumstøtte og Norgespris-sammenligning
-- Nettleie med kapasitetsledd, kraftavtalens faste månedspris og total brutto/netto for din ordning (Norgespris eller straumstøtte)
+- Nettleie med kapasitetsledd, kraftavtalens faste månedspris og Totalt for din ordning (Norgespris eller straumstøtte)
 - Valgfri live effekt fra en sensor du har fra før (f.eks. Tibber Pulse)
 - Valgfri, eksperimentell live effekt direkte fra Amperium for deg med Dobbe-modul (samme sanntidsstrøm som appen). Du velger ved oppsett om du har modulen
 - Timeforbruk importert som statistikk til Energidashbordet (velg «Amperium forbruk»)
@@ -22,6 +22,7 @@ Strømforbruk, kostnad og pris **direkte fra Finnås Kraftlag** via Amperium-pla
 - HAN-status hvert 5. minutt, siste data fra HAN-måleren og antall timer Amperium mangler data for (diagnostikk)
 - Live-strøm som kommer tilbake av seg selv, med status-sensor og handlingen `amperium.koble_til_live`
 - Strømregnskap: nettleie før støtte, fast månedspris, Norgespris og snittpris for forrige måned, og handlingen `amperium.hent_periode` for valgfrie perioder
+- Fra 0.14.0: navn etter fakturaen. Handlingen `amperium.oppdater_navn` viser og kan bytte de gamle entitets-ID-ene (se README, «Navn og fakturaen»)
 
 ## Oppsett
 1. Installer via HACS og start Home Assistant på nytt.
