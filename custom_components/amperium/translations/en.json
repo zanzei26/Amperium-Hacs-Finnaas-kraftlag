@@ -44,7 +44,7 @@
         "title": "Dobbe module",
         "description": "Do you have a Dobbe module (the HAN sensor that sends your meter readings to Amperium)? Then the integration can read live power directly from Amperium. It is experimental, and you can change this later under Configure.",
         "data": {
-          "has_dobbe": "I have a Dobbe module"
+          "has_dobbe": "I have a Dobbe module (experimental live stream)"
         }
       }
     },
@@ -73,13 +73,13 @@
         "name": "Power now"
       },
       "cost_total": {
-        "name": "Total cost after subsidy this month (electricity incl. fixed monthly price + grid rent)"
+        "name": "Kraft + Nettleie after subsidy this month"
       },
       "cost_energy": {
-        "name": "Energy cost gross this month"
+        "name": "Kraft (electricity) this month"
       },
       "cost_grid_rent": {
-        "name": "Grid rent after subsidy this month (incl. capacity charge)"
+        "name": "Nettleie (grid rent) after subsidy this month"
       },
       "spot_price": {
         "name": "Spot price now"
@@ -106,10 +106,10 @@
         "name": "Export today"
       },
       "cost_yesterday": {
-        "name": "Gross energy cost yesterday"
+        "name": "Spot price and surcharge yesterday"
       },
       "norgespris_month": {
-        "name": "Norgespris compensation this month"
+        "name": "Norgespris this month"
       },
       "han_signal": {
         "name": "HAN signal"
@@ -136,34 +136,34 @@
         }
       },
       "energy_gross_month": {
-        "name": "Energy cost gross this month (summed from hourly data)"
+        "name": "Spot price and surcharge this month (sum of the hours)"
       },
       "vat_month": {
-        "name": "VAT on energy this month"
+        "name": "Of which VAT on Kraft this month"
       },
       "net_norgespris_month": {
-        "name": "Net cost with Norgespris (incl. fixed monthly price)"
+        "name": "Total this month with Norgespris"
       },
       "net_subsidy_month": {
-        "name": "Net cost with electricity subsidy (incl. fixed monthly price)"
+        "name": "Total this month with electricity subsidy"
       },
       "norgespris_saves_month": {
         "name": "Norgespris saves this month"
       },
       "cost_energy_last_month": {
-        "name": "Energy cost gross last month"
+        "name": "Kraft (electricity) last month"
       },
       "cost_grid_rent_last_month": {
-        "name": "Grid rent after subsidy last month (incl. capacity charge)"
+        "name": "Nettleie (grid rent) after subsidy last month"
       },
       "cost_last_month": {
-        "name": "Total cost after subsidy last month (electricity incl. fixed monthly price + grid rent)"
+        "name": "Kraft + Nettleie after subsidy last month"
       },
       "compensation_month": {
-        "name": "Compensation this month (your scheme)"
+        "name": "Support this month (Norgespris or electricity subsidy)"
       },
       "net_cost_month": {
-        "name": "Net cost this month (your scheme, incl. fixed monthly price)"
+        "name": "Total this month (so far)"
       },
       "live_power": {
         "name": "Power now (live)"
@@ -172,16 +172,16 @@
         "name": "Hour power this hour (forecast)"
       },
       "grid_gross_month": {
-        "name": "Grid rent before subsidy this month (incl. capacity charge)"
+        "name": "Nettleie (grid rent) before subsidy this month"
       },
       "subsidy_applied_month": {
-        "name": "Electricity subsidy applied to grid rent this month"
+        "name": "Electricity subsidy this month"
       },
       "fixed_month": {
-        "name": "Fixed monthly price (electricity supply) this month"
+        "name": "Fixed monthly price this month"
       },
       "gross_total_month": {
-        "name": "Total gross this month (electricity incl. fixed monthly price + grid rent, before support)"
+        "name": "Kraft + Nettleie before support this month"
       },
       "capacity_avg_kw": {
         "name": "Capacity basis this month"
@@ -214,31 +214,31 @@
         "name": "Login valid until"
       },
       "amperium_live_power": {
-        "name": "Power now (Amperium live)"
+        "name": "Power now (Amperium live, experimental)"
       },
       "grid_gross_last_month": {
-        "name": "Grid rent before subsidy last month (incl. capacity charge)"
+        "name": "Nettleie (grid rent) before subsidy last month"
       },
       "subsidy_applied_last_month": {
-        "name": "Subsidy deducted from grid rent last month"
+        "name": "Electricity subsidy last month"
       },
       "fixed_last_month": {
-        "name": "Fixed monthly price (electricity supply) last month"
+        "name": "Fixed monthly price last month"
       },
       "norgespris_last_month": {
-        "name": "Norgespris compensation last month"
+        "name": "Norgespris last month"
       },
       "net_cost_last_month": {
-        "name": "Net cost last month (your scheme, incl. fixed monthly price)"
+        "name": "Total last month"
       },
       "avg_price_last_month": {
-        "name": "Average price last month (your scheme, incl. fixed monthly price)"
+        "name": "Average price last month (Total ÷ consumption)"
       },
       "avg_price_month": {
-        "name": "Average price this month (your scheme, incl. fixed monthly price)"
+        "name": "Average price this month (Total ÷ consumption)"
       },
       "amperium_live_status": {
-        "name": "Amperium live status",
+        "name": "Amperium live status (experimental)",
         "state": {
           "off": "Off",
           "starting": "Starting",
@@ -271,11 +271,11 @@
           "day_end": "Day ends (hour, 1-24)",
           "scheme": "Scheme",
           "power_entity": "Power sensor (optional)",
-          "has_dobbe": "I have a Dobbe module"
+          "has_dobbe": "I have a Dobbe module (experimental live stream)"
         },
         "data_description": {
           "power_entity": "Optional. Pick a sensor with the whole house's power, e.g. Tibber Pulse/Watty. Used for live power and a forecast of this hour's average. A charger such as Easee only shows the charger's power and does not fit.",
-          "has_dobbe": "Pick this if you have a Dobbe module (the HAN sensor that sends your meter readings to Amperium). The integration then connects to Amperium's live feed, the one the app uses, and you get \"Power now (Amperium live)\". The first time, the aio-pika library is installed. \"Power now\" uses it when you have no power sensor of your own, or yours is unavailable. It has not been confirmed that the module delivers live readings; see the attributes of \"Power now (Amperium live)\"."
+          "has_dobbe": "Pick this if you have a Dobbe module (the HAN sensor that sends your meter readings to Amperium). The integration then connects to Amperium's live feed, the one the app uses, and you get \"Power now (Amperium live, experimental)\". The first time, the aio-pika library is installed. \"Power now\" uses it when you have no power sensor of your own, or yours is unavailable. It has not been confirmed that the module delivers live readings; see the attributes of \"Power now (Amperium live, experimental)\"."
         }
       }
     },
@@ -318,8 +318,22 @@
     },
     "koble_til_live": {
       "name": "Reconnect live feed",
-      "description": "Drops Amperium's live stream and subscribes again at once, with the waiting between attempts reset. Use it when \"Power now (Amperium live)\" is unavailable and you do not want to restart Home Assistant. Only has an effect when the option \"I have a Dobbe module\" is on.",
+      "description": "Drops Amperium's live stream and subscribes again at once, with the waiting between attempts reset. Use it when \"Power now (Amperium live, experimental)\" is unavailable and you do not want to restart Home Assistant. Only has an effect when the option \"I have a Dobbe module (experimental live stream)\" is on.",
       "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Which Amperium entry to use. Only needed with more than one."
+        }
+      }
+    },
+    "oppdater_navn": {
+      "name": "Update entity IDs to the invoice names",
+      "description": "From 0.14.0 the sensors are named after the invoice, but an entity ID that already exists does not change by itself. This action gives the renamed sensors the ID Home Assistant would give them on a new installation. By default (show only) it changes nothing and only shows what it would do. Everything that mentions the old IDs (templates, automations, dashboards, the Energy panel) must be updated at the same time. Sensors you have named yourself are left alone.",
+      "fields": {
+        "kun_vis": {
+          "name": "Show the plan only",
+          "description": "On (default): nothing is changed, the answer only shows what would change. Off: the IDs are changed."
+        },
         "entry_id": {
           "name": "Entry",
           "description": "Which Amperium entry to use. Only needed with more than one."

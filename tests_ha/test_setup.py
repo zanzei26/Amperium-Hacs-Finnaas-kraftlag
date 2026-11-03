@@ -15,6 +15,7 @@ async def test_the_integration_sets_up_and_creates_its_entities(hass, api):
     assert value(hass, entry, "han_online", "binary_sensor") == "on"
     assert hass.services.has_service(DOMAIN, "hent_periode")
     assert hass.services.has_service(DOMAIN, "koble_til_live")
+    assert hass.services.has_service(DOMAIN, "oppdater_navn")
 
 
 async def test_unloading_removes_the_entry_and_the_services(hass, api):
@@ -24,6 +25,7 @@ async def test_unloading_removes_the_entry_and_the_services(hass, api):
     assert entry.state is ConfigEntryState.NOT_LOADED
     assert not hass.services.has_service(DOMAIN, "hent_periode")
     assert not hass.services.has_service(DOMAIN, "koble_til_live")
+    assert not hass.services.has_service(DOMAIN, "oppdater_navn")
 
 
 async def test_a_login_that_is_no_longer_valid_starts_re_authentication(hass, api):

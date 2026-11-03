@@ -55,7 +55,8 @@ async def test_the_fixed_price_sensor_is_named_for_what_it_is(hass, api):
     entry = await setup_entry(hass, make_entry())
     state = hass.states.get(entity_id(hass, entry, "fixed_month"))
     assert state.state == "25.0"
-    assert state.attributes["friendly_name"].endswith("Fixed monthly price (electricity supply) this month")
+    # The invoice's word, not "fastledd" (the grid rent has none) and not a "(kraft)" suffix.
+    assert state.attributes["friendly_name"].endswith("Fixed monthly price this month")
 
 
 async def test_han_status_and_the_newest_data(hass, api):
