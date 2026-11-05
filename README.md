@@ -226,7 +226,11 @@ data:
 
 **Felt og advarsler i `hent_periode`:** `norgespris_kwh` er antall kWh som er med i Norgespris-kompensasjonen etter taket. `norgespris_cap_reached` betyr at månedens tak ble nådd inni perioden (senere timer får ingenting). `norgespris_kwh_below_consumption` betyr at ikke alt forbruk i perioden fikk Norgespris (mer enn 0,5 kWh under). I måneder over 5 000 kWh er begge normale.
 
-**Ikke kontrollert i en ekte Home Assistant ennå.** Rettelsen er testet mot en etterligning av Amperiums oppførsel. Kontroller «Totalt» og Norgespris for en måned over 4 000 kWh mot fakturaen etter at du har installert den. Hvis Amperium retter feilen sin, er resultatet fortsatt riktig, og delhentingen blir bare unødvendig.
+**Amperium kjenner ikke taket på 5 000 kWh.** Det er målt i én installasjon: en lang forespørsel (over cirka 4 000 kWh fra starten) stopper ved cirka 4 000 kWh, og en kort forespørsel stopper aldri, heller ikke når måneden er over 5 000 kWh. Timetallene har altså ingen tak på 5 000, så det er integrasjonen som legger det på.
+
+**Kontrollert i en ekte Home Assistant (5. november 2026, én installasjon, Norgespris).** `hent_periode` for november 2025 til mars 2026 ga Norgespris-linjen som på fakturaene: nøyaktig for november til februar (januar telte nøyaktig 5 000 kWh og meldte `norgespris_cap_reached`) og innenfor 0,02 kr for mars. En periode midt i januar (21. januar til 1. februar) ga det regnestykket tilsier (innenfor 0,01 kr), og en periode etter taket ga 0. «Totalt» var innenfor 0,05 kr i januar og februar. Mars avvek 0,10 kr (Amperiums nettleie og forbruk avviker litt fra fakturaen), og november og desember avvek med Dobbe-modulgebyret på fakturaen (25 kr og to kreditter), som Amperium ikke viser.
+
+**Ikke sett ennå:** sensorene med delhenting. De bruker den først når en måned har over 3 000 kWh; oktober 2026 og november hittil er under. Kontroller «Norgespris forrige måned» for en måned over 3 000 kWh mot `hent_periode` og fakturaen.
 
 **Testet mot faktura:** Handlingen for hele september ble kontrollert mot en ekte faktura i Home Assistant (v0.12.0): Kraft, nettleie før støtte, Norgespris-kompensasjon, sum, kWh og kr/kWh stemte med fakturaen innen 0–2 øre. Tallene er ikke publisert. Rettelsen i 0.12.1 (den faste månedsprisen er med én gang) er kontrollert i de automatiske testene, som bruker oppdiktede tall med samme oppbygning som fakturaen, men er ikke kjørt i Home Assistant.
 
