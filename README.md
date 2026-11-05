@@ -24,7 +24,7 @@ Sensorer per anlegg:
 | «Kraft denne måneden» | Kraft hittil i måneden, brutto inkl. mva, før støtte (kr), fra månedstallene. **Inkl. den faste månedsprisen** (25 kr). Fakturaens «Kraft» |
 | «Nettleie etter straumstøtte denne måneden» | Nettleie inkl. kapasitetsledd, **etter** straumstøtte (kr). Nettleien har ikke noe fastledd |
 | «Kraft + Nettleie etter straumstøtte denne måneden» | Kraft (inkl. fast månedspris) + nettleie som over (kr). Dette er Amperiums eget månedstall |
-| «Kraft forrige måned», «Nettleie etter straumstøtte forrige måned», «Kraft + Nettleie etter straumstøtte forrige måned» | De samme tre tallene for forrige måned (kr). Fra 0.16.1 er Kraft bygget fra timeprisene når alle timer har forbruk og pris, ellers er det Amperiums tall; attributtet `kilde` sier hvilket, og `fra_amperium` viser Amperiums eget tall. Se «Spotsnitt» |
+| «Kraft forrige måned», «Nettleie etter straumstøtte forrige måned», «Kraft + Nettleie etter straumstøtte forrige måned» | De samme tre tallene for forrige måned (kr). Fra 0.16.1 (for måneder med klokkeskifte fra 0.16.2) er Kraft bygget fra timeprisene når alle timer har forbruk og pris, ellers er det Amperiums tall; attributtet `kilde` sier hvilket, og `fra_amperium` viser Amperiums eget tall. Se «Spotsnitt» |
 | «Nettleie før straumstøtte forrige måned» | Nettleie inkl. kapasitetsledd, før støtte (kr) for forrige måned: «Nettleie etter straumstøtte» + støtten. Postene ligger som attributter |
 | «Straumstøtte forrige måned» | Støtten som er trukket fra nettleien i månedstallene (kr). Gjelder ikke på Norgespris |
 | «Fast månedspris forrige måned» | Kraftavtalens faste månedspris forrige måned (kr). Den er **en del av** Kraft, ikke et tillegg (se «Navn og fakturaen» om entitets-ID-ene) |
