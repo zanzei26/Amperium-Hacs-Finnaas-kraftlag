@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import AmperiumAuthError, AmperiumClient, AmperiumError, summarise_prices
+from .charges import apply_cap, async_uncapped_hourly_charges, unknown_norgespris
 from .const import (
     CONF_ACCESS_EXPIRES,
     CONF_ACCESS_TOKEN,
@@ -255,6 +256,36 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         result["prices_tomorrow"] = [b for b in tomorrow if b.get("spot") is not None]
         return result
 
+    async def _async_month_charge_hours(
+        self,
+        site: int,
+        start: datetime,
+        end: datetime,
+        energy_part: list[dict[str, Any]] | None,
+        response: dict[str, Any],
+        now: datetime,
+        tz: Any,
+    ) -> list[dict[str, Any]]:
+        """The hourly charges of one month window, with Norgespris limited to the month's ceiling.
+
+        Amperium cuts the Norgespris of one long request short at about 4 000 kWh, so a long month is
+        asked for in pieces (see charges.py) and the invoice's ceiling is applied here. If the
+        consumption or a piece cannot be fetched the ceiling cannot be applied: the Norgespris
+        figures are then unknown, and the last good values stay.
+        """
+        if energy_part is None:
+            return unknown_norgespris(response["energy"])
+        try:
+            hourly = await async_uncapped_hourly_charges(
+                self.client, site, start, end, energy_part, response, now
+            )
+        except AmperiumAuthError:
+            raise
+        except AmperiumError as err:
+            _LOGGER.debug("Could not fetch the hourly charges in pieces: %s", err)
+            return unknown_norgespris(response["energy"])
+        return apply_cap(hourly, energy_part, now, tz)
+
     async def _async_fetch_extended(self, producing: bool) -> dict[str, Any]:
         """Fetch hourly consumption/charges and the Norgespris comparison.
 
@@ -285,8 +316,10 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for start, end in windows:
                 if end <= start:
                     continue
+                energy_part: list[dict[str, Any]] | None = None
                 try:
-                    energy += await client.async_get_energy(site, start, end)
+                    energy_part = await client.async_get_energy(site, start, end)
+                    energy += energy_part
                     energy_ok = True
                     this_month_ok = this_month_ok or start == this_start
                 except AmperiumAuthError:
@@ -295,7 +328,9 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.debug("Could not fetch hourly energy: %s", err)
                 try:
                     response = await client.async_get_charges(site, start, end)
-                    charges += response["energy"]
+                    charges += await self._async_month_charge_hours(
+                        site, start, end, energy_part, response, now, tz
+                    )
                     grid_responses["" if start == this_start else "_last_month"] = response
                 except AmperiumAuthError:
                     raise

@@ -343,6 +343,9 @@ def summarise_charges(
     cost = gross = tax = norgespris = 0.0
     last_gross = last_tax = last_norgespris = 0.0
     have_cost = have_month = have_last = False
+    # A Norgespris figure that is None is unknown (see charges.unknown_norgespris): then the
+    # month's Norgespris is left out, so the last good value stays instead of a wrong sum.
+    known_month = known_last = True
     for bucket in hours:
         local = bucket["start"].astimezone(tz)
         if local.date() == yesterday:
@@ -351,23 +354,31 @@ def summarise_charges(
         if (local.year, local.month) == (this_start.year, this_start.month):
             gross += bucket["energy"]
             tax += bucket["tax"]
-            norgespris += bucket["norgespris"]
+            if bucket["norgespris"] is None:
+                known_month = False
+            else:
+                norgespris += bucket["norgespris"]
             have_month = True
         elif (local.year, local.month) == (prev_start.year, prev_start.month):
             last_gross += bucket["energy"]
             last_tax += bucket["tax"]
-            last_norgespris += bucket["norgespris"]
+            if bucket["norgespris"] is None:
+                known_last = False
+            else:
+                last_norgespris += bucket["norgespris"]
             have_last = True
     if have_cost:
         out["cost_yesterday"] = cost
     if have_month:
         out["energy_gross_month"] = gross
         out["vat_month"] = tax
-        out["norgespris_month"] = norgespris
+        if known_month:
+            out["norgespris_month"] = norgespris
     if have_last:
         out["energy_gross_last_month"] = last_gross
         out["vat_last_month"] = last_tax
-        out["norgespris_last_month"] = last_norgespris
+        if known_last:
+            out["norgespris_last_month"] = last_norgespris
     return out
 
 
@@ -691,7 +702,9 @@ def summarise_period(
     ]
     hourly_energy = sum(b["energy"] for b in charge_hours) if charge_hours else None
     vat_hourly = sum(b["tax"] for b in charge_hours) if charge_hours else None
-    norgespris = sum(b["norgespris"] for b in charge_hours) if charge_hours else None
+    norgespris_values = [b["norgespris"] for b in charge_hours]
+    norgespris_unknown = None in norgespris_values
+    norgespris = sum(norgespris_values) if charge_hours and not norgespris_unknown else None
     # The kWh that got Norgespris compensation, and the consumption in the same hours (the two
     # are only comparable over the hours that have a cost row, which is not always every hour).
     counted = [b["norgespris_kwh"] for b in charge_hours if b.get("norgespris_kwh") is not None]
@@ -732,6 +745,11 @@ def summarise_period(
         # Not all the consumption got Norgespris compensation: either a ceiling was reached or
         # hours with a spot price under Norgespris do not count. Which one is not confirmed.
         warnings.append("norgespris_kwh_below_consumption")
+    if norgespris_unknown:
+        warnings.append("norgespris_unknown")
+    if any(b.get("norgespris_cap_frac", 1.0) < 1.0 for b in charge_hours):
+        # The month's ceiling (5 000 kWh) was reached inside the period: later hours get no Norgespris.
+        warnings.append("norgespris_cap_reached")
     if not grid:
         warnings.append("no_grid_rent_in_answer")
     if fixed is None:
