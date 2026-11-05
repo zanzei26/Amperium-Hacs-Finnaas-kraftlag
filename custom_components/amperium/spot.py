@@ -141,7 +141,13 @@ def _round(value: float | None, digits: int) -> float | None:
 
 
 def expected_hours(start: dt.datetime, end: dt.datetime, now: dt.datetime) -> int:
-    """The whole hours of [start, end) that have passed (the same count ``summarise_period`` uses)."""
+    """The whole hours of [start, end) that have passed (the same count ``summarise_period`` uses).
+
+    The ends are turned into UTC first: two datetimes in the same time zone are subtracted as if
+    the clock never changed, which would count October as 744 hours and not the 745 it has.
+    """
+    utc = dt.timezone.utc
+    start, end, now = start.astimezone(utc), end.astimezone(utc), now.astimezone(utc)
     cutoff = min(end, now.replace(minute=0, second=0, microsecond=0))
     return max(0, round((cutoff - start).total_seconds() / 3600))
 

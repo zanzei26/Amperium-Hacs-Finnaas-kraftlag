@@ -341,3 +341,25 @@ def test_the_check_of_the_fixed_price_in_amperiums_total_is_made_on_amperiums_fi
     out = _run(_october_like_client(32.0, prices([1.0, 2.0])))
     assert out["kraft_kilde"] == "priser" and out["energy_gross_amperium"] == pytest.approx(27.0)
     assert "fixed_monthly_price_not_in_energy_total" not in out["warnings"]
+
+
+def test_a_month_with_the_autumn_clock_change_has_745_hours_when_the_ends_are_local_times():
+    """The coordinator passes the month's ends as local times (not UTC), which is where 744 came from."""
+    first = dt.datetime(2026, 10, 1, tzinfo=OSLO)
+    after = dt.datetime(2026, 11, 1, tzinfo=OSLO)
+    assert (after - first) == dt.timedelta(days=31)            # the trap: the same zone ignores the change
+    assert spot.expected_hours(first, after, dt.datetime(2026, 11, 5, tzinfo=UTC)) == 745
+    spring_first, spring_after = dt.datetime(2027, 3, 1, tzinfo=OSLO), dt.datetime(2027, 4, 1, tzinfo=OSLO)
+    assert spot.expected_hours(spring_first, spring_after, dt.datetime(2027, 4, 5, tzinfo=UTC)) == 743
+
+
+def test_kraft_from_the_prices_is_used_for_october_when_called_the_way_the_coordinator_calls_it():
+    first = dt.datetime(2026, 10, 1, tzinfo=OSLO)
+    after = dt.datetime(2026, 11, 1, tzinfo=OSLO)
+    start = first.astimezone(UTC)
+    cons, series = energy([1] * 745, start), prices([1.0] * 745, start)
+    out = spot.kraft_from_prices(cons, series, first, after, dt.datetime(2026, 11, 5, tzinfo=UTC), 25.0)
+    assert out is not None and out[0] == pytest.approx(745 * 1.0392 * 1.25 + 25.0)
+    # one hour short, as it would be if a price were missing, is still refused
+    assert spot.kraft_from_prices(cons[:-1], series, first, after,
+                                  dt.datetime(2026, 11, 5, tzinfo=UTC), 25.0) is None
