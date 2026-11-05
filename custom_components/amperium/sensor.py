@@ -929,6 +929,11 @@ class AmperiumSensor(CoordinatorEntity[AmperiumCoordinator], SensorEntity):
                 "prices_today": data.get("prices_today", []),
                 "prices_tomorrow": data.get("prices_tomorrow", []),
             }
+        if key == "cost_energy_last_month":
+            return {
+                "kilde": data.get("kraft_last_month_source"),
+                "fra_amperium": _round(data.get("kraft_last_month_amperium"), 2),
+            }
         if key == "grid_gross_month":
             return data.get("grid_breakdown")
         if key == "grid_gross_last_month":

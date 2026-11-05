@@ -39,7 +39,17 @@ async def test_this_months_weighted_spot_is_the_hourly_prices_weighted_by_consum
     assert attrs["inkl_paslag"] == pytest.approx(expected + 0.05 * 1.25, abs=1e-4)
 
 
+async def test_last_months_weighted_spot_equals_the_invoices_kraftpris_per_kwh(hass, api):
+    entry = await setup_entry(hass, make_entry())
+    # the default September prices add up to the invoice's Kraftpris (3110.40) over 1788.52 kWh
+    assert float(value(hass, entry, "spot_avg_last_month")) == pytest.approx(3110.40 / 1788.520, abs=1e-4)
+    attrs = attributes(hass, entry, "spot_avg_last_month")
+    assert attrs["inkl_paslag"] == pytest.approx(3194.50 / 1788.520, abs=1e-4)
+    assert attrs["kwh"] == pytest.approx(1788.520)
+
+
 async def test_last_months_weighted_spot_uses_last_months_hours(hass, api):
+    api.september_prices = None
     entry = await setup_entry(hass, make_entry())
     hours = hours_between(SEPT_START, SEPT_END)
     expected = sum(spot_of(h) * 1.25 for h in hours) / len(hours)
@@ -111,3 +121,47 @@ async def test_failing_month_prices_leave_the_spot_sensors_unknown_and_the_rest_
     assert value(hass, entry, "spot_avg_month") == "unknown"
     assert float(value(hass, entry, "price_min_today_incl")) > 0         # today's prices still work
     assert float(value(hass, entry, "energy_month")) == pytest.approx(72.0)
+
+
+# --- last month's Kraft, rebuilt from the prices when every hour has one --------------------------
+
+def september_kraft_from_prices() -> float:
+    """Kraft for September from the hour-dependent prices: 2.484 kWh an hour, VAT 25 %, fixed 25."""
+    hours = hours_between(SEPT_START, SEPT_END)
+    return sum(1788.520 / len(hours) * (spot_of(h) + 0.05) * 1.25 for h in hours) + 25.0
+
+
+async def test_last_months_kraft_follows_the_prices_when_amperium_is_off_and_keeps_amperiums_figure(hass, api):
+    api.september_prices = None
+    entry = await setup_entry(hass, make_entry(scheme="norgespris"))
+    kraft = september_kraft_from_prices()
+    assert abs(kraft - 3219.50) > 1.0                       # this scenario is one where they differ
+    assert float(value(hass, entry, "cost_energy_last_month")) == pytest.approx(kraft, abs=0.01)
+    attrs = attributes(hass, entry, "cost_energy_last_month")
+    assert attrs["kilde"] == "priser" and attrs["fra_amperium"] == pytest.approx(3219.50, abs=0.005)
+    # Kraft + Nettleie after support, the total for the scheme and the average price follow
+    assert float(value(hass, entry, "cost_last_month")) == pytest.approx(kraft - 112.40, abs=0.01)
+    total = kraft - 112.40 + 1455.05 - 2236.80              # + the subsidy added back - Norgespris
+    assert float(value(hass, entry, "net_cost_last_month")) == pytest.approx(total, abs=0.01)
+    assert float(value(hass, entry, "avg_price_last_month")) == pytest.approx(total / 1788.520, abs=5e-5)
+
+
+async def test_last_months_kraft_is_the_same_number_when_the_prices_agree_with_amperium(hass, api):
+    entry = await setup_entry(hass, make_entry(scheme="norgespris"))
+    assert float(value(hass, entry, "cost_energy_last_month")) == pytest.approx(3219.50, abs=0.01)
+    attrs = attributes(hass, entry, "cost_energy_last_month")
+    assert attrs["kilde"] == "priser" and attrs["fra_amperium"] == pytest.approx(3219.50, abs=0.005)
+
+
+async def test_last_months_kraft_stays_amperiums_when_an_hour_has_no_price(hass, api):
+    api.september_prices = None
+    original = api._prices
+
+    def without_one_hour(query):
+        return [r for r in original(query) if r["startTime"] != "2026-09-15T10:00:00Z"]
+
+    api._prices = without_one_hour
+    entry = await setup_entry(hass, make_entry(scheme="norgespris"))
+    assert float(value(hass, entry, "cost_energy_last_month")) == pytest.approx(3219.50, abs=0.005)
+    assert attributes(hass, entry, "cost_energy_last_month")["kilde"] == "amperium"
+    assert float(value(hass, entry, "net_cost_last_month")) == pytest.approx(2325.35, abs=0.005)

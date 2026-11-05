@@ -45,7 +45,7 @@ from .derived import (
     summarise_energy,
     summarise_grid,
 )
-from .spot import cap_split, weighted_spot
+from .spot import cap_split, kraft_from_prices, weighted_spot
 from .statistics import async_import_statistics
 
 _LOGGER = logging.getLogger(__name__)
@@ -391,6 +391,21 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if isinstance(b.get("start"), datetime) and start <= b["start"] < end
             ]
             new[f"cap_detail_{suffix}"] = cap_split(month_energy, prices, now, tz)
+        # Last month's Kraft (and Kraft + Nettleie) is rebuilt from the hourly prices when every
+        # hour has consumption and a price: it equals Amperium's to the øre in the months checked,
+        # but Amperium's answer for a month that holds the autumn clock change (25 October 2026)
+        # came out about 7 kr too low. Amperium's own figure stays as an attribute.
+        amperium_kraft = new.get("cost_energy_last_month")
+        if amperium_kraft is not None:
+            rebuilt = kraft_from_prices(
+                energy, month_prices.get(prev_start), prev_start, this_start, now,
+                new.get("fixed_total_last_month"),
+            )
+            new["kraft_last_month_amperium"] = amperium_kraft
+            new["kraft_last_month_source"] = "amperium" if rebuilt is None else "priser"
+            if rebuilt is not None:
+                new["cost_energy_last_month"] = rebuilt[0]
+                new["cost_last_month"] = rebuilt[0] + new["cost_grid_rent_last_month"]
         # The billing split of day/night kWh comes straight from Amperium
         # (gridRent); prefer it over our own hour-of-day classification.
         for api_key, own_key in (

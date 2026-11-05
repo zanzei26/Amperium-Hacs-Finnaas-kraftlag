@@ -679,6 +679,9 @@ def summarise_period(
     end: dt.datetime,
     now: dt.datetime,
     tz: dt.tzinfo,
+    *,
+    kraft_override: float | None = None,
+    vat_override: float | None = None,
 ) -> dict[str, Any]:
     """Cost and consumption for one free period [start, end), for a landlord's accounts.
 
@@ -689,6 +692,10 @@ def summarise_period(
     Kraft: spot price and surcharge per hour plus the kraft's fixed monthly price
     (``fixed_monthly_price``), which is part of it and not an extra. Amounts in kr,
     energy in kWh. ``warnings`` lists anything that makes the numbers less reliable.
+
+    ``kraft_override`` (and ``vat_override``) replace Amperium's Kraft with one rebuilt from the
+    hourly prices (see ``spot.kraft_from_prices``); everything that is made from Kraft follows.
+    Amperium's own figure stays in ``energy_gross_amperium``.
     """
     charges = charges or {}
     warnings: list[str] = []
@@ -727,6 +734,11 @@ def summarise_period(
     else:
         energy_gross = hourly_energy
     vat = vat_with_fixed_price(vat_hourly, hourly_energy, fixed)
+    energy_gross_amperium = energy_gross
+    if kraft_override is not None:
+        energy_gross = kraft_override
+        if vat_override is not None:
+            vat = vat_override
 
     cost_norgespris = house_cost("norgespris", energy_gross, grid_after, compensation, norgespris)
     cost_subsidy = house_cost("subsidy", energy_gross, grid_after, compensation, norgespris)
@@ -760,7 +772,7 @@ def summarise_period(
         and hourly_energy is not None
         and len(hours) == expected
         and len(charge_hours) == len(hours)
-        and abs((energy_gross - hourly_energy) - float(fixed)) > 1.0
+        and abs((energy_gross_amperium - hourly_energy) - float(fixed)) > 1.0
     ):
         # The total is expected to be the hours plus the fixed monthly price.
         warnings.append("fixed_monthly_price_not_in_energy_total")
@@ -776,6 +788,8 @@ def summarise_period(
         "hours_with_data": len(hours),
         "consumption_kwh": _r(kwh, 3),
         "energy_gross": _r(energy_gross, 2),
+        "energy_gross_amperium": _r(energy_gross_amperium, 2),
+        "kraft_kilde": "amperium" if kraft_override is None else "priser",
         "energy_gross_hourly_sum": _r(hourly_energy, 2),
         "vat_on_energy": _r(vat, 2),
         "grid_before_support": _r(grid_before, 2),

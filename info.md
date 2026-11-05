@@ -23,6 +23,7 @@ Strømforbruk, kostnad og pris **direkte fra Finnås Kraftlag** via Amperium-pla
 - Live-strøm som kommer tilbake av seg selv, med status-sensor og handlingen `amperium.koble_til_live`
 - Strømregnskap: nettleie før støtte, fast månedspris, Norgespris og snittpris for forrige måned, og handlingen `amperium.hent_periode` for valgfrie perioder
 - Fra 0.16.0: forbruksvektet spotsnitt (denne og forrige måned), strømpris i dag inkl. påslag og mva, og Norgespris-taket som attributter (se README, «Spotsnitt»)
+- Fra 0.16.1: Kraft for forrige måned og i `hent_periode` bygges fra timeprisene når alle timer har pris (retter oktober 2026, som var 7,54 kr for lav hos Amperium)
 - Fra 0.14.0: navn etter fakturaen. Handlingen `amperium.oppdater_navn` viser og kan bytte de gamle entitets-ID-ene (se README, «Navn og fakturaen»)
 
 ## Oppsett

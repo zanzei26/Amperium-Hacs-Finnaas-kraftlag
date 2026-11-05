@@ -188,7 +188,12 @@ def test_the_period_answer_has_the_price_fields():
         _period_client(prices([1.0, 2.0])), 1, START, START + 2 * HOUR, OSLO, now=NOW
     ))
     assert out["spotsnitt"] == pytest.approx(1.875) and out["spot_manglende_timer"] == 0
-    assert out["kraft_fra_priser"] is not None and out["energy_gross"] == pytest.approx(5.0)
+    # Amperium's Kraft in this fake (10 - 5 = 5) is far from the prices, which have every hour: the
+    # one rebuilt from the prices is used, and Amperium's stays next to it.
+    assert out["kraft_fra_priser"] is not None
+    assert out["energy_gross"] == pytest.approx(out["kraft_fra_priser"])
+    assert out["energy_gross_amperium"] == pytest.approx(5.0)
+    assert out["kraft_kilde"] == "priser"
 
 
 def test_a_failing_price_request_does_not_take_the_rest_of_the_answer_with_it():
@@ -212,3 +217,127 @@ def test_a_price_request_refused_for_the_login_is_not_swallowed():
         asyncio.run(period.async_period_summary(
             _period_client(api.AmperiumAuthError("no")), 1, START, START + 2 * HOUR, OSLO, now=NOW
         ))
+
+
+# --- Kraft from the prices replaces Amperium's when every hour has a price ---------------------------
+
+def _october_like_client(amperium_total, prices_answer, fixed=25.0, energy_rows=None):
+    """Two hours of 2 kWh; Amperium's Kraft is ``amperium_total`` - 5 (the grid rent after support)."""
+    rows = energy_rows if energy_rows is not None else energy([2, 2])
+
+    class Client:
+        async def async_get_energy(self, site_id, start, end):
+            return rows
+
+        async def async_get_charges(self, site_id, start, end):
+            return {
+                "energy": [{"start": START + i * HOUR, "end": START + (i + 1) * HOUR, "energy": 1.0,
+                            "tax": 0.2, "norgespris": 0.5, "norgespris_kwh": 2.0} for i in range(2)],
+                "outer_total": amperium_total, "fixed_total": fixed,
+                "grid": {"total": 5.0, "compensation": 1.0, "capacity_amount": 0.0,
+                         "capacity_avg_kw": 1.0},
+            }
+
+        async def async_get_prices(self, site_id, start, end):
+            return prices_answer
+
+    return Client()
+
+
+def _run(client, scheme="norgespris"):
+    import asyncio
+
+    from conftest import period
+
+    return asyncio.run(period.async_period_summary(client, 1, START, START + 2 * HOUR, OSLO,
+                                                   scheme, now=NOW))
+
+
+FROM_PRICES = 2 * 1.0392 * 1.25 + 2 * 2.0392 * 1.25 + 25.0       # Kraft rebuilt from the two hours
+
+
+def test_kraft_from_the_prices_is_returned_with_its_vat():
+    out = spot.kraft_from_prices(energy([2, 2]), prices([1.0, 2.0]), START, START + 2 * HOUR, NOW, 25.0)
+    kraft, vat = out
+    assert kraft == pytest.approx(FROM_PRICES)
+    assert vat == pytest.approx(FROM_PRICES * 0.2)       # 25 % VAT is 20 % of the amount incl. VAT
+
+
+@pytest.mark.parametrize("case", ["no prices", "empty prices", "a price missing", "no fixed price",
+                                  "a consumption hour missing", "no consumption"])
+def test_kraft_from_the_prices_is_not_used_unless_every_hour_has_consumption_and_a_price(case):
+    cons, series, fixed = energy([2, 2]), prices([1.0, 2.0]), 25.0
+    if case == "no prices":
+        series = None
+    elif case == "empty prices":
+        series = []
+    elif case == "a price missing":
+        series = series[:1]
+    elif case == "no fixed price":
+        fixed = None
+    elif case == "a consumption hour missing":
+        cons = cons[:1]
+    elif case == "no consumption":
+        cons = energy([0, 0])
+    assert spot.kraft_from_prices(cons, series, START, START + 2 * HOUR, NOW, fixed) is None
+
+
+def test_kraft_from_the_prices_works_on_the_day_with_25_hours():
+    day = dt.datetime(2026, 10, 25, tzinfo=OSLO).astimezone(UTC)
+    end = dt.datetime(2026, 10, 26, tzinfo=OSLO).astimezone(UTC)
+    assert (end - day) == 25 * HOUR
+    out = spot.kraft_from_prices(energy([1] * 25, day), prices([1.0] * 25, day), day, end, NOW, 0.0)
+    assert out is not None and out[0] == pytest.approx(25 * 1.0392 * 1.25)
+
+
+def test_a_month_where_amperium_is_too_low_gets_kraft_from_the_prices_in_everything_made_from_it():
+    low = FROM_PRICES + 5.0 - 7.54                       # Amperium: 7.54 kr under the prices
+    out = _run(_october_like_client(low, prices([1.0, 2.0])))
+    assert out["kraft_kilde"] == "priser"
+    assert out["energy_gross"] == pytest.approx(FROM_PRICES, abs=0.005)
+    assert out["energy_gross_amperium"] == pytest.approx(FROM_PRICES - 7.54, abs=0.005)
+    assert out["kraft_avvik_fra_priser"] == pytest.approx(-7.54, abs=0.005)      # the difference stays visible
+    assert out["vat_on_energy"] == pytest.approx(FROM_PRICES * 0.2, abs=0.005)
+    # house cost = Kraft + grid rent before support - Norgespris, from the corrected Kraft
+    expected_cost = FROM_PRICES + 5.0 + 1.0 - out["norgespris_compensation"]
+    assert out["house_cost_norgespris"] == pytest.approx(expected_cost, abs=0.01)
+    assert out["price_per_kwh_norgespris"] == pytest.approx(expected_cost / 4, abs=1e-4)
+    assert "kraft_fra_priser_brukt" in out["warnings"]
+    assert "kraft_avviker_fra_priser" not in out["warnings"]
+
+
+def test_when_amperium_and_the_prices_agree_nothing_changes_and_nothing_is_warned():
+    out = _run(_october_like_client(FROM_PRICES + 5.0, prices([1.0, 2.0])))
+    assert out["energy_gross"] == pytest.approx(FROM_PRICES, abs=0.005)
+    assert out["energy_gross_amperium"] == pytest.approx(FROM_PRICES, abs=0.005)
+    assert not any(w.startswith("kraft_") for w in out["warnings"])
+
+
+@pytest.mark.parametrize("case", ["a price missing", "no fixed price", "prices not fetched"])
+def test_amperiums_kraft_stays_when_the_prices_cannot_be_trusted(case):
+    series, fixed = prices([1.0, 2.0]), 25.0
+    if case == "a price missing":
+        series = series[:1]
+    elif case == "no fixed price":
+        fixed = None
+    elif case == "prices not fetched":
+        series = None
+    low = FROM_PRICES + 5.0 - 7.54
+    out = _run(_october_like_client(low, series, fixed=fixed))
+    assert out["kraft_kilde"] == "amperium"
+    assert out["energy_gross"] == pytest.approx(low - 5.0, abs=0.005)       # Amperium's figure, untouched
+    assert "kraft_fra_priser_brukt" not in out["warnings"]
+
+
+def test_amperiums_kraft_stays_when_an_hour_of_consumption_is_missing():
+    low = FROM_PRICES + 5.0 - 7.54
+    out = _run(_october_like_client(low, prices([1.0, 2.0]), energy_rows=energy([2])))
+    assert out["kraft_kilde"] == "amperium"
+    assert any(w.startswith("hours_missing") for w in out["warnings"])
+
+
+def test_the_check_of_the_fixed_price_in_amperiums_total_is_made_on_amperiums_figure_not_the_replacement():
+    # Amperium's own numbers are consistent: hours 2.00 + fixed 25.00 = 27.00 (32.00 - grid 5.00).
+    out = _run(_october_like_client(32.0, prices([1.0, 2.0])))
+    assert out["kraft_kilde"] == "priser" and out["energy_gross_amperium"] == pytest.approx(27.0)
+    assert "fixed_monthly_price_not_in_energy_total" not in out["warnings"]
