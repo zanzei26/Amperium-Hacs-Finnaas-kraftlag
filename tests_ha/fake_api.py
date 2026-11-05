@@ -64,6 +64,12 @@ class FakeAmperium:
         self.oct_hourly_kwh = 2.0
         self.oct_hourly_energy = 1.5
         self.oct_fixed = 25.0
+        # Norgespris per kWh, and where Amperium cuts one request short: it stops adding
+        # compensation after about this many kWh counted from the start of the request (None = never).
+        self.oct_comp_per_kwh = 0.3
+        self.amperium_cut_kwh: float | None = 4000.0
+        # Answer 500 to a charges request shorter than 30 hours (the pieces of a long month).
+        self.fail_short_charge_windows = False
         # Anything in here is returned as it is, for a path that starts with the key.
         self.overrides: dict[str, tuple[int, Any]] = {}
         # Called with (method, path) before answering; may raise to simulate a failure.
@@ -98,6 +104,10 @@ class FakeAmperium:
                              "accessTokenExpiresAt": "2026-10-07T10:30:00Z",
                              "refreshTokenExpiresAt": "2027-10-02T10:30:00Z"}
             return 401, {"title": "Invalid code"}
+        if route.endswith("/consumption/charges") and self.fail_short_charge_windows:
+            first, last = self._window(query)
+            if last - first < dt.timedelta(hours=30):
+                return 500, None
         if route == f"/api/sites/{SITE_ID}/prices":
             return 200, self._prices(query)
         if route == f"/api/sites/{SITE_ID}/consumption/energy":
@@ -203,15 +213,23 @@ class FakeAmperium:
                  if h not in self.missing_hours and h < NOW.replace(minute=0, second=0)]
         energy = len(hours) * self.oct_hourly_energy
         grid_after = 120.0
-        return {
-            "energy": [
+        rows = []
+        counted = 0.0
+        for h in hours:
+            share = 1.0
+            if self.amperium_cut_kwh is not None:
+                share = min(1.0, max(0.0, (self.amperium_cut_kwh - counted) / self.oct_hourly_kwh))
+                counted += self.oct_hourly_kwh
+            rows.append(
                 {"from": iso(h), "to": iso(h + dt.timedelta(hours=1)),
                  "importedEnergyAmount": self.oct_hourly_energy,
                  "salesTaxAmount": self.oct_hourly_energy * 0.2,
-                 "importedCompensationAmountNorgespris": 0.6,
-                 "importedCompensationEnergyNorgespris": self.oct_hourly_kwh}
-                for h in hours
-            ],
+                 "importedCompensationAmountNorgespris":
+                     self.oct_comp_per_kwh * self.oct_hourly_kwh * share,
+                 "importedCompensationEnergyNorgespris": self.oct_hourly_kwh * share}
+            )
+        return {
+            "energy": rows,
             "totalAmount": energy + self.oct_fixed + grid_after,
             "gridRent": {
                 "totalAmount": grid_after, "compensationAmount": 40.0,
