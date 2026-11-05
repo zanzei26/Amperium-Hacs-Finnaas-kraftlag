@@ -18,7 +18,7 @@ from .charges import (
     async_uncapped_hourly_charges,
 )
 from .derived import summarise_period
-from .spot import period_price_fields
+from .spot import kraft_from_prices, period_price_fields
 
 
 async def async_period_summary(
@@ -41,7 +41,8 @@ async def async_period_summary(
     # The ceiling counts from the 1st: add what the month had used before the period began.
     before = await async_month_energy_before(client, site_id, start, tz)
     capped = apply_cap(hourly, before + energy, now, tz)
-    result = summarise_period(energy, {**charges, "energy": capped}, start, end, now, tz)
+    with_cap = {**charges, "energy": capped}
+    result = summarise_period(energy, with_cap, start, end, now, tz)
     # The hourly prices are an extra (the weighted spot price, and Kraft rebuilt from the prices to
     # compare with Amperium's): if they cannot be fetched the rest of the answer still stands.
     try:
@@ -53,6 +54,15 @@ async def async_period_summary(
     fields, warnings = period_price_fields(
         energy, prices, start, end, now, result.get("energy_gross"), result.get("fixed_monthly_price")
     )
+    # Amperium's Kraft is replaced by the one rebuilt from the prices when every hour has a price
+    # and consumption: they agree to the øre in the months checked, but Amperium's answer is a few
+    # kr too low for a request that crosses the autumn clock change (25 October 2026).
+    rebuilt = kraft_from_prices(energy, prices, start, end, now, result.get("fixed_monthly_price"))
+    if rebuilt is not None:
+        result = summarise_period(
+            energy, with_cap, start, end, now, tz, kraft_override=rebuilt[0], vat_override=rebuilt[1]
+        )
+        warnings = ["kraft_fra_priser_brukt" if w == "kraft_avviker_fra_priser" else w for w in warnings]
     result.update(fields)
     result["warnings"] = [*result["warnings"], *warnings]
     result["scheme"] = scheme

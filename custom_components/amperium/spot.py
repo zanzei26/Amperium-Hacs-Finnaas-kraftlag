@@ -11,7 +11,7 @@ import datetime as dt
 from typing import Any
 
 from .charges import NORGESPRIS_CAP_KWH, cap_shares
-from .derived import _parse_iso, complete_hours
+from .derived import _parse_iso, complete_hours, vat_with_fixed_price
 
 MAX_LISTED_HOURS = 48
 # A difference between Amperium's Kraft and the one rebuilt from the prices over this (kr) is a warning.
@@ -52,7 +52,7 @@ def weighted_spot(
     in kr, so a period's Kraft can be compared hour for hour.
     """
     index = price_index(prices)
-    kwh = spot_ex = spot_incl = paslag_incl = 0.0
+    kwh = spot_ex = spot_incl = paslag_incl = vat_sum = 0.0
     priced = zero_price = 0
     missing: list[str] = []
     missing_count = 0
@@ -71,6 +71,7 @@ def weighted_spot(
         spot_ex += weight * price["spot"]
         spot_incl += weight * price["spot"] * factor
         paslag_incl += weight * price["surcharge"] * factor
+        vat_sum += weight * (price["spot"] + price["surcharge"]) * (factor - 1)
         priced += 1
         if price["spot"] == 0:
             zero_price += 1
@@ -87,6 +88,7 @@ def weighted_spot(
         "timer_med_pris_null": zero_price,
         "sum_spot_inkl_mva": spot_incl,
         "sum_paslag_inkl_mva": paslag_incl,
+        "sum_mva": vat_sum,
     }
 
 
@@ -136,6 +138,40 @@ def cap_split(
 
 def _round(value: float | None, digits: int) -> float | None:
     return None if value is None else round(value, digits)
+
+
+def expected_hours(start: dt.datetime, end: dt.datetime, now: dt.datetime) -> int:
+    """The whole hours of [start, end) that have passed (the same count ``summarise_period`` uses)."""
+    cutoff = min(end, now.replace(minute=0, second=0, microsecond=0))
+    return max(0, round((cutoff - start).total_seconds() / 3600))
+
+
+def kraft_from_prices(
+    energy: list[dict[str, Any]],
+    prices: list[dict[str, Any]] | None,
+    start: dt.datetime,
+    end: dt.datetime,
+    now: dt.datetime,
+    fixed: float | None,
+) -> tuple[float, float] | None:
+    """Kraft and its VAT rebuilt from the hourly prices, or None when that cannot be trusted.
+
+    Kraft is the sum over the hours of kWh x (spot + surcharge) incl. VAT, plus the fixed monthly
+    price. It is only returned when every hour of the period has consumption AND a price, so
+    nothing is made up and nothing is left out. It equals Amperium's own Kraft (which matched the
+    invoices) to the øre in the seven months tried, except October 2026, where Amperium's answer
+    for a request that crosses the clock change (25 October) came out about 7.5 kr too low.
+    """
+    if prices is None or fixed is None:     # without the fixed price the sum would miss it
+        return None
+    avg = weighted_spot(energy, prices, start, end, now)
+    # "timer" counts the hours that have both consumption and a price, so it is only equal to the
+    # hours that have passed when none lacks either.
+    if avg["kwh"] <= 0 or avg["timer"] != expected_hours(start, end, now):
+        return None
+    gross = avg["sum_spot_inkl_mva"] + avg["sum_paslag_inkl_mva"]
+    kraft = gross + fixed
+    return kraft, vat_with_fixed_price(avg["sum_mva"], gross, fixed)
 
 
 def period_price_fields(

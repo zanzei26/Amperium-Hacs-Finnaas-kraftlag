@@ -16,8 +16,6 @@ async def call(hass, service, data, **kwargs):
 
 
 async def test_hent_periode_for_september_matches_the_invoice(hass, api):
-    # Prices that add up to the invoice's Kraftpris (3110.40) and Spot påslag (84.10), VAT included.
-    api.september_prices = (3110.40 / 1.25 / 1788.520, 84.10 / 1.25 / 1788.520)
     await setup_entry(hass, make_entry(scheme="norgespris"))
     out = await call(hass, "hent_periode", {"fra": "2026-09-01", "til": "2026-10-01"},
                      return_response=True)
@@ -42,16 +40,39 @@ async def test_hent_periode_for_september_matches_the_invoice(hass, api):
     assert out["spot_manglende_timer"] == 0
 
 
-async def test_hent_periode_flags_a_kraft_that_differs_from_the_hourly_prices(hass, api):
-    """With the fake's default prices the hours do not add up to the invoice-like Kraft."""
+async def test_hent_periode_uses_kraft_from_the_prices_when_amperium_is_off(hass, api):
+    """Hour-dependent prices do not add up to the invoice-like Kraft: the prices win, and say so."""
+    api.september_prices = None
     await setup_entry(hass, make_entry(scheme="norgespris"))
     out = await call(hass, "hent_periode", {"fra": "2026-09-01", "til": "2026-10-01"},
                      return_response=True)
-    assert out["warnings"] == ["kraft_avviker_fra_priser"]
-    assert out["energy_gross"] == pytest.approx(3219.50, abs=0.005)      # Amperium's figure is untouched
+    assert out["warnings"] == ["kraft_fra_priser_brukt"]
+    assert out["kraft_kilde"] == "priser"
+    assert out["energy_gross_amperium"] == pytest.approx(3219.50, abs=0.005)    # Amperium's own figure
+    assert out["energy_gross"] == pytest.approx(out["kraft_fra_priser"], abs=0.005)
     assert out["kraft_avvik_fra_priser"] == pytest.approx(
-        out["energy_gross"] - out["kraft_fra_priser"], abs=0.01)
+        out["energy_gross_amperium"] - out["kraft_fra_priser"], abs=0.01)
     assert abs(out["kraft_avvik_fra_priser"]) > 1.0
+    # what is made from Kraft follows it: Kraft + Nettleie before support - Norgespris
+    assert out["house_cost_norgespris"] == pytest.approx(
+        out["energy_gross"] + out["grid_before_support"] - out["norgespris_compensation"], abs=0.01)
+
+
+async def test_hent_periode_keeps_amperiums_kraft_when_a_price_is_missing(hass, api):
+    api.september_prices = None
+    original = api._prices
+
+    def without_one_hour(query):
+        return [r for r in original(query) if r["startTime"] != "2026-09-15T10:00:00Z"]
+
+    api._prices = without_one_hour
+    await setup_entry(hass, make_entry(scheme="norgespris"))
+    out = await call(hass, "hent_periode", {"fra": "2026-09-01", "til": "2026-10-01"},
+                     return_response=True)
+    assert out["kraft_kilde"] == "amperium"
+    assert out["energy_gross"] == pytest.approx(3219.50, abs=0.005)
+    assert "priser_mangler:1" in out["warnings"]
+    assert out["spot_manglende_timer"] == 1
 
 
 async def test_hent_periode_warns_about_a_period_over_a_month_end(hass, api):

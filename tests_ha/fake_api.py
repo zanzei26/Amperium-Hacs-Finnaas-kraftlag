@@ -30,6 +30,10 @@ SEPT_NORGESPRIS = 2236.80
 SEPT_GRID_AFTER = -112.40
 SEPT_SUBSIDY = 1342.65 + 112.40  # derived: nettleie 1342.65 = after + subsidy
 SEPT_FIXED = 25.0
+# Hourly prices (ex VAT, per kWh) that add up to the invoice's Kraftpris and Spot påslag, so the
+# Kraft rebuilt from the prices equals the invoice's Kraft (3219.50) in the September tests.
+SEPT_SPOT_EX_VAT = 3110.40 / 1.25 / SEPT_KWH
+SEPT_SURCHARGE_EX_VAT = 84.10 / 1.25 / SEPT_KWH
 
 # --- October 2026, up to "now" (2 October 12:30 Oslo) ---------------------------------------
 OCT_START = dt.datetime(2026, 9, 30, 22, tzinfo=UTC)  # 1 Oct 00:00 Europe/Oslo
@@ -72,8 +76,9 @@ class FakeAmperium:
         self.fail_short_charge_windows = False
         # Answer 500 to a prices request longer than 30 hours (the month-sized ones).
         self.fail_long_price_windows = False
-        # (spot, surcharge) ex VAT per kWh for every September hour; None = the hour-dependent default.
-        self.september_prices: tuple[float, float] | None = None
+        # (spot, surcharge) ex VAT per kWh for every September hour. The default adds up to the invoice;
+        # None gives the hour-dependent prices (spot 0.5 + hour x 0.01, surcharge 0.05) of October.
+        self.september_prices: tuple[float, float] | None = (SEPT_SPOT_EX_VAT, SEPT_SURCHARGE_EX_VAT)
         # Anything in here is returned as it is, for a path that starts with the key.
         self.overrides: dict[str, tuple[int, Any]] = {}
         # Called with (method, path) before answering; may raise to simulate a failure.
