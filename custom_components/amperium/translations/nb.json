@@ -115,13 +115,13 @@
         "name": "HAN-signal"
       },
       "price_min_today": {
-        "name": "Laveste spotpris i dag"
+        "name": "Laveste børspris i dag"
       },
       "price_max_today": {
-        "name": "Høyeste spotpris i dag"
+        "name": "Høyeste børspris i dag"
       },
       "price_avg_today": {
-        "name": "Spotpris snitt i dag"
+        "name": "Børspris snitt i dag"
       },
       "han_signal_quality": {
         "name": "HAN-signalkvalitet",
@@ -253,6 +253,21 @@
       },
       "hours_missing_month": {
         "name": "Manglende timer denne måneden"
+      },
+      "price_min_today_incl": {
+        "name": "Laveste strømpris i dag inkl. påslag og mva"
+      },
+      "price_max_today_incl": {
+        "name": "Høyeste strømpris i dag inkl. påslag og mva"
+      },
+      "price_avg_today_incl": {
+        "name": "Strømpris snitt i dag inkl. påslag og mva"
+      },
+      "spot_avg_month": {
+        "name": "Spotsnitt denne måneden"
+      },
+      "spot_avg_last_month": {
+        "name": "Spotsnitt forrige måned"
       }
     },
     "binary_sensor": {

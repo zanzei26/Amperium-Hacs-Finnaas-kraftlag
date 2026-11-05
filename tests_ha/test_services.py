@@ -16,6 +16,8 @@ async def call(hass, service, data, **kwargs):
 
 
 async def test_hent_periode_for_september_matches_the_invoice(hass, api):
+    # Prices that add up to the invoice's Kraftpris (3110.40) and Spot påslag (84.10), VAT included.
+    api.september_prices = (3110.40 / 1.25 / 1788.520, 84.10 / 1.25 / 1788.520)
     await setup_entry(hass, make_entry(scheme="norgespris"))
     out = await call(hass, "hent_periode", {"fra": "2026-09-01", "til": "2026-10-01"},
                      return_response=True)
@@ -32,6 +34,24 @@ async def test_hent_periode_for_september_matches_the_invoice(hass, api):
     assert out["house_cost_norgespris"] == pytest.approx(2325.35, abs=0.005)  # Totalt
     assert out["price_per_kwh_norgespris"] == pytest.approx(1.3002, abs=5e-5)
     assert "fixed_fee" not in out
+    # The same Kraft rebuilt from the hourly prices, and what is left between the two.
+    assert out["spotsnitt"] == pytest.approx(3110.40 / 1788.520, abs=5e-5)
+    assert out["spot_inkl_paslag"] == pytest.approx(3194.50 / 1788.520, abs=5e-5)
+    assert out["kraft_fra_priser"] == pytest.approx(3219.50, abs=0.01)
+    assert out["kraft_avvik_fra_priser"] == pytest.approx(0.0, abs=0.01)
+    assert out["spot_manglende_timer"] == 0
+
+
+async def test_hent_periode_flags_a_kraft_that_differs_from_the_hourly_prices(hass, api):
+    """With the fake's default prices the hours do not add up to the invoice-like Kraft."""
+    await setup_entry(hass, make_entry(scheme="norgespris"))
+    out = await call(hass, "hent_periode", {"fra": "2026-09-01", "til": "2026-10-01"},
+                     return_response=True)
+    assert out["warnings"] == ["kraft_avviker_fra_priser"]
+    assert out["energy_gross"] == pytest.approx(3219.50, abs=0.005)      # Amperium's figure is untouched
+    assert out["kraft_avvik_fra_priser"] == pytest.approx(
+        out["energy_gross"] - out["kraft_fra_priser"], abs=0.01)
+    assert abs(out["kraft_avvik_fra_priser"]) > 1.0
 
 
 async def test_hent_periode_warns_about_a_period_over_a_month_end(hass, api):

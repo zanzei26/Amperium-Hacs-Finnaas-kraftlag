@@ -93,6 +93,33 @@ async def async_month_energy_before(
     return await client.async_get_energy(site_id, month_start_utc, start)
 
 
+def cap_shares(
+    energy: list[dict[str, Any]],
+    now: dt.datetime,
+    tz: dt.tzinfo,
+    cap_kwh: float = NORGESPRIS_CAP_KWH,
+) -> dict[dt.datetime, tuple[float, float]]:
+    """For each hour of consumption: (the share of it under the month's ceiling, its kWh).
+
+    The ceiling counts the first ``cap_kwh`` of each local calendar month in the order the hours
+    came, so ``energy`` must hold the consumption from the 1st. An hour before the ceiling has the
+    share 1.0, an hour after it 0.0, and the hour that crosses it the part that is under it.
+    """
+    shares: dict[dt.datetime, tuple[float, float]] = {}
+    month: tuple[int, int] | None = None
+    running = 0.0
+    for bucket in complete_hours(energy, now):
+        local = bucket["start"].astimezone(tz)
+        if (local.year, local.month) != month:
+            month = (local.year, local.month)
+            running = 0.0
+        kwh = bucket["import"]
+        frac = 1.0 if kwh <= 0 else min(1.0, max(0.0, (cap_kwh - running) / kwh))
+        shares[bucket["start"]] = (frac, kwh)
+        running += kwh
+    return shares
+
+
 def apply_cap(
     charge_hours: list[dict[str, Any]],
     energy: list[dict[str, Any]],
@@ -108,25 +135,14 @@ def apply_cap(
     (there is nothing to count it against). ``norgespris_cap_frac`` says what share was kept.
     A Norgespris figure that is None (unknown) stays None.
     """
-    before: dict[dt.datetime, tuple[float, float]] = {}
-    month: tuple[int, int] | None = None
-    running = 0.0
-    for bucket in complete_hours(energy, now):
-        local = bucket["start"].astimezone(tz)
-        if (local.year, local.month) != month:
-            month = (local.year, local.month)
-            running = 0.0
-        before[bucket["start"]] = (running, bucket["import"])
-        running += bucket["import"]
-
+    shares = cap_shares(energy, now, tz, cap_kwh)
     out: list[dict[str, Any]] = []
     for bucket in charge_hours:
-        known = before.get(bucket.get("start"))
+        known = shares.get(bucket.get("start"))
         if known is None:
             out.append(bucket)
             continue
-        counted, kwh = known
-        frac = 1.0 if kwh <= 0 else min(1.0, max(0.0, (cap_kwh - counted) / kwh))
+        frac = known[0]
         scaled = dict(bucket)
         scaled["norgespris_cap_frac"] = frac
         for key in ("norgespris", "norgespris_kwh"):

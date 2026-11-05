@@ -70,6 +70,10 @@ class FakeAmperium:
         self.amperium_cut_kwh: float | None = 4000.0
         # Answer 500 to a charges request shorter than 30 hours (the pieces of a long month).
         self.fail_short_charge_windows = False
+        # Answer 500 to a prices request longer than 30 hours (the month-sized ones).
+        self.fail_long_price_windows = False
+        # (spot, surcharge) ex VAT per kWh for every September hour; None = the hour-dependent default.
+        self.september_prices: tuple[float, float] | None = None
         # Anything in here is returned as it is, for a path that starts with the key.
         self.overrides: dict[str, tuple[int, Any]] = {}
         # Called with (method, path) before answering; may raise to simulate a failure.
@@ -107,6 +111,10 @@ class FakeAmperium:
         if route.endswith("/consumption/charges") and self.fail_short_charge_windows:
             first, last = self._window(query)
             if last - first < dt.timedelta(hours=30):
+                return 500, None
+        if route.endswith("/prices") and self.fail_long_price_windows:
+            first, last = self._window(query)
+            if last - first > dt.timedelta(hours=30):
                 return 500, None
         if route == f"/api/sites/{SITE_ID}/prices":
             return 200, self._prices(query)
@@ -154,12 +162,15 @@ class FakeAmperium:
         end = dt.datetime.strptime(query["to"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
         if start >= NOW:  # tomorrow's prices are not published yet
             return []
-        return [
-            {"startTime": iso(h), "endTime": iso(h + dt.timedelta(hours=1)),
-             "spotPreliminary": 0.5 + h.hour * 0.01, "spotOfficial": 0.5 + h.hour * 0.01,
-             "surcharge": 0.05, "salesTaxPercentage": 25, "updatedOn": iso(NOW)}
-            for h in hours_between(start, end)
-        ]
+
+        def row(h: dt.datetime) -> dict[str, Any]:
+            spot, surcharge = (self.september_prices if self.september_prices and h < OCT_START
+                               else (0.5 + h.hour * 0.01, 0.05))
+            return {"startTime": iso(h), "endTime": iso(h + dt.timedelta(hours=1)),
+                    "spotPreliminary": spot, "spotOfficial": spot, "surcharge": surcharge,
+                    "salesTaxPercentage": 25, "updatedOn": iso(NOW)}
+
+        return [row(h) for h in hours_between(start, end)]
 
     def _window(self, query: dict[str, str]) -> tuple[dt.datetime, dt.datetime]:
         parse = lambda text: dt.datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)  # noqa: E731
