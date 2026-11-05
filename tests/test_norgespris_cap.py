@@ -56,6 +56,9 @@ class FakeAmperium:
         return [{"start": h["start"], "end": h["end"], "import": h["import"], "export": 0.0}
                 for h in self._inside(start, end)]
 
+    async def async_get_prices(self, site_id, start, end):
+        return []                      # not recorded: these tests count energy and charges calls
+
     async def async_get_charges(self, site_id, start, end):
         self.calls.append(("charges", start, end))
         buckets, counted = [], 0.0

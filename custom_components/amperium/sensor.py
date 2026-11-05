@@ -626,7 +626,88 @@ SENSORS: tuple[AmperiumSensorDescription, ...] = (
         suggested_display_precision=3,
         value_fn=lambda d: _round(d.get("price_avg_today"), 4),
     ),
+    # The same three, with the surcharge and VAT (what the consumer pays), like "Power price now".
+    AmperiumSensorDescription(
+        key="price_min_today_incl",
+        translation_key="price_min_today_incl",
+        native_unit_of_measurement="kr/kWh",
+        icon="mdi:arrow-down-bold",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        value_fn=lambda d: _round(d.get("price_min_consumer"), 4),
+    ),
+    AmperiumSensorDescription(
+        key="price_max_today_incl",
+        translation_key="price_max_today_incl",
+        native_unit_of_measurement="kr/kWh",
+        icon="mdi:arrow-up-bold",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        value_fn=lambda d: _round(d.get("price_max_consumer"), 4),
+    ),
+    AmperiumSensorDescription(
+        key="price_avg_today_incl",
+        translation_key="price_avg_today_incl",
+        native_unit_of_measurement="kr/kWh",
+        icon="mdi:chart-line-variant",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        value_fn=lambda d: _round(d.get("price_avg_consumer"), 4),
+    ),
+    # The consumption-weighted spot price of the month, incl. VAT and without the surcharge: the
+    # invoice's "Kraftpris". Norgespris is this minus 0.50. The hourly prices are weighted by the
+    # hourly consumption.
+    AmperiumSensorDescription(
+        key="spot_avg_month",
+        translation_key="spot_avg_month",
+        native_unit_of_measurement="kr/kWh",
+        icon="mdi:chart-bell-curve-cumulative",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=4,
+        value_fn=lambda d: _round((d.get("spot_avg_month") or {}).get("spotsnitt"), 4),
+    ),
+    AmperiumSensorDescription(
+        key="spot_avg_last_month",
+        translation_key="spot_avg_last_month",
+        native_unit_of_measurement="kr/kWh",
+        icon="mdi:chart-bell-curve-cumulative",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=4,
+        value_fn=lambda d: _round((d.get("spot_avg_last_month") or {}).get("spotsnitt"), 4),
+    ),
 )
+
+# What the exchange-price sensors are based on, shown as an attribute on them.
+BORSPRIS = "børspris, uten påslag og mva"
+
+
+def _spot_attributes(detail: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Attributes of a weighted-spot sensor (see spot.weighted_spot)."""
+    if not detail:
+        return None
+    return {
+        "borspris": _round(detail.get("borspris"), 4),
+        "paslag": _round(detail.get("paslag"), 4),
+        "inkl_paslag": _round(detail.get("inkl_paslag"), 4),
+        "kwh": _round(detail.get("kwh"), 3),
+        "timer": detail.get("timer"),
+        "manglende_timer": detail.get("manglende_timer"),
+        "manglende_timer_liste": detail.get("manglende_timer_liste", []),
+        "timer_med_pris_null": detail.get("timer_med_pris_null"),
+    }
+
+
+def _cap_attributes(detail: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Attributes of a Norgespris sensor: the consumption under and over the 5 000 kWh ceiling."""
+    if not detail:
+        return None
+    return {
+        "norgespris_kwh": _round(detail.get("norgespris_kwh"), 3),
+        "over_tak_kwh": _round(detail.get("over_tak_kwh"), 3),
+        "spotsnitt_over_tak": _round(detail.get("spotsnitt_over_tak"), 4),
+        "spotsnitt_over_tak_uten_paslag": _round(detail.get("spotsnitt_over_tak_uten_paslag"), 4),
+        "over_tak_uten_pris_kwh": _round(detail.get("over_tak_uten_pris_kwh"), 3),
+    }
 
 
 def _round(value: Any, digits: int) -> Any:
@@ -872,14 +953,30 @@ class AmperiumSensor(CoordinatorEntity[AmperiumCoordinator], SensorEntity):
             return {
                 "hour": data.get("price_min_hour"),
                 "consumer": data.get("price_min_consumer"),
+                "grunnlag": BORSPRIS,
             }
         if key == "price_max_today":
             return {
                 "hour": data.get("price_max_hour"),
                 "consumer": data.get("price_max_consumer"),
+                "grunnlag": BORSPRIS,
             }
         if key == "price_avg_today":
-            return {"consumer": data.get("price_avg_consumer")}
+            return {"consumer": data.get("price_avg_consumer"), "grunnlag": BORSPRIS}
+        if key == "price_min_today_incl":
+            return {"hour": data.get("price_min_hour"), "borspris": data.get("price_min_today")}
+        if key == "price_max_today_incl":
+            return {"hour": data.get("price_max_hour"), "borspris": data.get("price_max_today")}
+        if key == "price_avg_today_incl":
+            return {"borspris": data.get("price_avg_today")}
+        if key == "spot_avg_month":
+            return _spot_attributes(data.get("spot_avg_month"))
+        if key == "spot_avg_last_month":
+            return _spot_attributes(data.get("spot_avg_last_month"))
+        if key == "norgespris_month":
+            return _cap_attributes(data.get("cap_detail_month"))
+        if key == "norgespris_last_month":
+            return _cap_attributes(data.get("cap_detail_last_month"))
         return None
 
 

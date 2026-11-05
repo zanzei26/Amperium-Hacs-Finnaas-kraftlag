@@ -28,7 +28,7 @@ Sensorer per anlegg:
 | «Nettleie før straumstøtte forrige måned» | Nettleie inkl. kapasitetsledd, før støtte (kr) for forrige måned: «Nettleie etter straumstøtte» + støtten. Postene ligger som attributter |
 | «Straumstøtte forrige måned» | Støtten som er trukket fra nettleien i månedstallene (kr). Gjelder ikke på Norgespris |
 | «Fast månedspris forrige måned» | Kraftavtalens faste månedspris forrige måned (kr). Den er **en del av** Kraft, ikke et tillegg (se «Navn og fakturaen» om entitets-ID-ene) |
-| «Norgespris forrige måned» | Norgespris-kompensasjon forrige måned, summert fra timedata (kr) |
+| «Norgespris forrige måned» | Norgespris-kompensasjon forrige måned, summert fra timedata (kr). Fra 0.16.0 med de samme attributtene som «Norgespris denne måneden» |
 | «Totalt forrige måned» | Som «Totalt denne måneden (hittil)», men for forrige måned (kr). Ordningen du har valgt, den faste månedsprisen er med én gang |
 | «Snittpris forrige måned (Totalt ÷ forbruk)» / «Snittpris denne måneden (Totalt ÷ forbruk)» (kr/kWh) | Husets snittpris for ordningen du har valgt. Den faste månedsprisen er med, fordi den ligger i Kraft. Se «Strømregnskap» |
 | «Nettleie før straumstøtte denne måneden» | Nettleie inkl. kapasitetsledd, før støtte (kr): «Nettleie etter straumstøtte» + støtten, så før − støtte = etter. Postene ligger som attributter (fra kostnadssvaret, kan avvike noen øre) |
@@ -38,9 +38,9 @@ Sensorer per anlegg:
 | «Kapasitetsleddet denne måneden» (kr) og «Til neste kapasitetstrinn» (kW) | Beløpet for trinnet du er i, og hvor mange kW det er til neste trinn. Samme for forrige måned |
 | `sensor.*_spotpris_na` | Spotpris nå (kr/kWh), uten mva og påslag. Offisiell pris når den er fastsatt, ellers prisen for gjeldende time fra timelisten (foreløpig). Attributtet `official` viser hvilken |
 | «Strømpris nå inkl. påslag og mva» | Prisen du betaler per kWh nå: (spot + påslag) × (1 + mva%), med mva-satsen fra Amperium. Tas fra inneværende time i prislisten. Avledet, ikke bekreftet mot appen |
-| `sensor.*_laveste_spotpris_i_dag` | Laveste timepris i dag (kr/kWh), med timen og prisen inkl. påslag og mva (`consumer`) som attributter |
-| `sensor.*_hoyeste_spotpris_i_dag` | Høyeste timepris i dag (kr/kWh), med timen og `consumer` som attributter |
-| `sensor.*_spotpris_snitt_i_dag` | Gjennomsnittlig timepris i dag (kr/kWh), med snittet inkl. påslag og mva (`consumer`) som attributt |
+| «Laveste børspris i dag», «Høyeste børspris i dag», «Børspris snitt i dag» (kr/kWh) | Timeprisene i dag **uten påslag og mva** (børsprisen). Timen og prisen inkl. påslag og mva (`consumer`) ligger som attributter, og `grunnlag` sier hva tallet er. Fra 0.16.0 heter de «børspris» i stedet for «spotpris»; en eksisterende installasjon beholder entitets-ID-ene `…laveste_spotpris_i_dag`, `…hoyeste_spotpris_i_dag` og `…spotpris_snitt_i_dag`, en ny installasjon får `…borspris…` |
+| «Laveste strømpris i dag inkl. påslag og mva», «Høyeste strømpris i dag inkl. påslag og mva», «Strømpris snitt i dag inkl. påslag og mva» (kr/kWh) | Fra 0.16.0. Det du betaler per kWh: (spot + påslag) × (1 + mva%), med laveste, høyeste og snittet av dagens timer. Børsprisen og timen ligger som attributter (`borspris`, `hour`). Nye sensorer; de gamle er ikke endret |
+| «Spotsnitt denne måneden» / «Spotsnitt forrige måned» (kr/kWh) | Fra 0.16.0. Timeprisene vektet med forbruket i hver time: spot **inkl. mva og uten påslag**, som fakturaens «Kraftpris» per kWh. Se «Spotsnitt» under «Strømregnskap». Entitets-ID-ene blir `…spotsnitt_denne_maneden` og `…spotsnitt_forrige_maned` |
 | `sensor.*_forbruk_i_gar` | Forbruk i går (kWh), summert fra timedata i lokal tid |
 | `sensor.*_forbruk_siste_time` | Forbruk siste hele time (kWh) |
 | `sensor.*_forbruk_forrige_maned` | Forbruk forrige måned (kWh) |
@@ -49,7 +49,7 @@ Sensorer per anlegg:
 | «Kraftpris og påslag denne måneden (sum av timene)» | Kraftpris og påslag hittil i måneden (kr), summert fra timedata. Har **ikke** med den faste månedsprisen, så den ligger 25 kr under «Kraft denne måneden» når timene er à jour |
 | «Herav MVA på Kraft denne måneden» | Mva-delen av Kraft hittil i måneden (kr), inkl. mva på den faste månedsprisen |
 | «Straumstøtte denne måneden» | Straumstøtten slik den er trukket fra nettleien (kr) |
-| «Norgespris denne måneden» | Norgespris-kompensasjon summert fra timedata (kr) |
+| «Norgespris denne måneden» | Norgespris-kompensasjon summert fra timedata (kr). Fra 0.16.0 med attributtene `norgespris_kwh`, `over_tak_kwh` og `spotsnitt_over_tak` (se «Norgespris-taket») |
 | «Støtte denne måneden (Norgespris eller straumstøtte)» | Beløpet for ordningen du har valgt (kr) |
 | «Totalt denne måneden (hittil)» | Totalt for ordningen du har valgt (kr). Den faste månedsprisen er med, én gang. Se «Kostnad: før støtte, støtte og totalt» |
 | «Totalt denne måneden med Norgespris» / «Totalt denne måneden med straumstøtte» | Totalt for hver ordning, avslått som standard |
@@ -226,6 +226,8 @@ data:
 
 **Felt og advarsler i `hent_periode`:** `norgespris_kwh` er antall kWh som er med i Norgespris-kompensasjonen etter taket. `norgespris_cap_reached` betyr at månedens tak ble nådd inni perioden (senere timer får ingenting). `norgespris_kwh_below_consumption` betyr at ikke alt forbruk i perioden fikk Norgespris (mer enn 0,5 kWh under). I måneder over 5 000 kWh er begge normale.
 
+**Attributter på «Norgespris denne måneden» og «Norgespris forrige måned» (fra 0.16.0):** `norgespris_kwh` er forbruket under taket (de første 5 000 kWh i måneden, kronologisk), `over_tak_kwh` er forbruket over det, og `spotsnitt_over_tak` er den vektede prisen per kWh på det som er over taket, **inkl. påslag og mva** (det en kWh over taket koster før støtte, uten Norgespris). `spotsnitt_over_tak_uten_paslag` er det samme uten påslag, og `over_tak_uten_pris_kwh` er den delen av forbruket over taket som ligger i timer uten pris (de er ikke med i prisen). Er forbruket under taket, er `over_tak_kwh` 0 og prisene tomme. Merk at `norgespris_kwh` på sensoren er regnet fra forbruket og taket, mens feltet `norgespris_kwh` i `hent_periode` er det Amperium oppgir etter taket (se over); for en hel måned der alle timer har kostnadsrader bør de være like (de er det i de automatiske testene), og avviker de, mangler Amperium kompensasjon for noen timer; sjekk `norgespris_kwh_below_consumption`. Ikke sett i en ekte Home Assistant ennå.
+
 **Amperium kjenner ikke taket på 5 000 kWh.** Det er målt i én installasjon: en lang forespørsel (over cirka 4 000 kWh fra starten) stopper ved cirka 4 000 kWh, og en kort forespørsel stopper aldri, heller ikke når måneden er over 5 000 kWh. Timetallene har altså ingen tak på 5 000, så det er integrasjonen som legger det på.
 
 **Kontrollert i en ekte Home Assistant (5. november 2026, én installasjon, Norgespris).** `hent_periode` for november 2025 til mars 2026 ga Norgespris-linjen som på fakturaene: nøyaktig for november til februar (januar telte nøyaktig 5 000 kWh og meldte `norgespris_cap_reached`) og innenfor 0,02 kr for mars. En periode midt i januar (21. januar til 1. februar) ga det regnestykket tilsier (innenfor 0,01 kr), og en periode etter taket ga 0. «Totalt» var innenfor 0,05 kr i januar og februar. Mars avvek 0,10 kr (Amperiums nettleie og forbruk avviker litt fra fakturaen), og november og desember avvek med Dobbe-modulgebyret på fakturaen (25 kr og to kreditter), som Amperium ikke viser.
@@ -237,6 +239,28 @@ data:
 **Oktober 2026 (én faktura, Norgespris):** forbruk, nettleie og kapasitetsledd stemte. «Kraft» var litt høyere på fakturaen, og «Totalt» avvek med under 0,3 %. Amperiums Kraft-total lå om lag 0,3 øre/kWh under fakturaens spotgrunnlag, mens Amperiums Norgespris-tall passet med det. Årsaken er ikke funnet. Den er ikke avrunding i integrasjonen: «Kraft» er Amperiums egen total (se «Kostnad»), og timebeløpene fra Amperium er ikke avrundet. Septemberfakturaen stemte på øret, så avviket er ikke konstant. Bruk tallene som peiling og kontroller mot fakturaen.
 
 **Ikke avklart:** Amperiums beskrivelse av kostnadsoppgaven sier bare «total charges for a site in a given period». Den sier ikke hvordan den faste månedsprisen og kapasitetsleddet fordeles i en periode som ikke er en hel måned. Derfor oppgir handlingen dem hver for seg (`capacity_charge`, `fixed_monthly_price` og `grid_before_support_excl_capacity`) og advarer med `period_spans_months` når perioden går over et månedsskifte. For 30.08–01.10 er det observert 50 kr i fast månedspris (to måneder); kapasitetsleddet for en slik periode er ikke kontrollert mot en faktura. Kontroller tall for perioder som ikke er en hel måned mot en faktura før du bruker dem.
+
+### Spotsnitt (fra 0.16.0)
+
+«Spotsnitt denne måneden» og «Spotsnitt forrige måned» (kr/kWh) er **timeprisene vektet med forbruket i hver time**: summen av (kWh i timen × spotpris i timen) delt på summen av kWh. Det er det samme som fakturaens «Kraftpris» delt på kWh. Det gjør dem nyttige for å regne ut hva en kWh over Norgespris-taket koster, og for å sammenligne mot Norgespris (som er spotsnittet minus 0,50 kr/kWh).
+
+**Grunnlaget er spotpris inkl. mva og uten påslag.** Fakturaens «Kraftpris» er spotprisen med mva, og påslaget («Spot påslag») er en egen linje. Spotsnittet er derfor *ikke* det du betaler per kWh for strømmen; legg til påslaget for det. Attributtene gir alle variantene:
+
+| Attributt | Innhold |
+|---|---|
+| `borspris` | Samme snitt uten mva (børsprisen) |
+| `paslag` | Påslaget per kWh inkl. mva, vektet på samme måte |
+| `inkl_paslag` | Spotsnittet pluss påslaget (kr/kWh, det du betaler for strømmen før støtte) |
+| `kwh` | Forbruket som er med i snittet |
+| `timer` | Antall timer med forbruk og pris |
+| `manglende_timer`, `manglende_timer_liste` | Timer med forbruk, men uten pris. De er **ikke** med i snittet, og det lages ikke noe pris for dem (listen viser opptil 48) |
+| `timer_med_pris_null` | Timer der børsprisen er 0. De er med i snittet |
+
+Prisene hentes fra Amperiums prisliste (den samme som gir timeprisene på «Spotpris nå»); forbruket er timeforbruket integrasjonen allerede har. Forrige måneds priser hentes én gang og beholdes. Kan prisene ikke hentes, beholder sensorene forrige gode verdi (ukjent hvis det ikke finnes noen), og resten fortsetter som før. Den offisielle prisen brukes når den er fastsatt, ellers den foreløpige.
+
+**I `amperium.hent_periode` (fra 0.16.0):** `spotsnitt`, `borspris`, `spot_inkl_paslag`, `spot_kwh`, `spot_timer`, `spot_manglende_timer` og `spot_timer_med_pris_null` for perioden, med samme grunnlag som sensorene. I tillegg to felt som setter Amperiums Kraft opp mot prisene: `kraft_fra_priser` er Kraft bygget opp fra timene (sum av kWh × (spot + påslag) inkl. mva, pluss den faste månedsprisen), og `kraft_avvik_fra_priser` er `energy_gross` minus det tallet. `energy_gross` er uendret og er fortsatt Amperiums eget tall. Nye advarsler: `priser_ikke_hentet` (prisene kunne ikke hentes; feltene er tomme), `priser_mangler:N` (N timer med forbruk uten pris) og `kraft_avviker_fra_priser` (avviket er over 1 kr).
+
+**Ikke kontrollert i en ekte Home Assistant ennå:** sensorene, feltene og advarslene er testet i de automatiske testene med oppdiktede tall (blant annet hele døgn med 25 og 23 timer), men ikke mot en ekte konto. Sammenlign «Spotsnitt forrige måned» med fakturaens «Kraftpris» delt på kWh og `kraft_avvik_fra_priser` med fakturaen før du stoler på dem.
 
 ### Kapasitetsledd
 
@@ -278,6 +302,8 @@ Dag/natt-forbruket for denne måneden hentes direkte fra Amperium (`gridRent.imp
 ### Timepriser
 
 Sensoren **Spotpris nå** har attributtene `official` (om prisen er offisiell eller foreløpig), `prices_today` og `prices_tomorrow`: lister med én rad per time (`start`, `end`, `spot`, `surcharge`, `vat_percent`, `official`). Prisene for i morgen kommer rundt midten av dagen. `spot` er offisiell spotpris når den er fastsatt, ellers foreløpig pris. Hver time har også `consumer`: prisen du betaler per kWh, (spot + påslag) inkl. mva. Listene kan brukes i for eksempel ApexCharts eller automasjoner.
+
+**Børspris eller strømpris?** «Laveste/Høyeste børspris i dag» og «Børspris snitt i dag» er prisene uten påslag og mva. Vil du ha prisen du faktisk betaler per kWh, bruk «Laveste/Høyeste strømpris i dag inkl. påslag og mva» og «Strømpris snitt i dag inkl. påslag og mva» (fra 0.16.0). «Snitt» her er det enkle gjennomsnittet av dagens timer, ikke vektet med forbruk; det vektede snittet for måneden er «Spotsnitt».
 
 ## Installasjon (HACS)
 
@@ -357,7 +383,7 @@ MIT – se [LICENSE](LICENSE).
 
 Det er to sett med tester:
 
-**Uten Home Assistant (`tests/`).** De rene beregningene og logikken (`derived.py`, `hourpower.py`, `api.py`, `amqp_feed.py`, `period.py`), og kontrolltester mot Amperiums API-beskrivelse.
+**Uten Home Assistant (`tests/`).** De rene beregningene og logikken (`derived.py`, `hourpower.py`, `api.py`, `amqp_feed.py`, `period.py`, `charges.py`, `spot.py`), og kontrolltester mot Amperiums API-beskrivelse.
 
 ```
 pip install -r requirements-dev.txt   # pytest, pytest-cov, aiohttp og ruff, med låste versjoner

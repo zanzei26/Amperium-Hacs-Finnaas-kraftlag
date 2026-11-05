@@ -45,6 +45,7 @@ from .derived import (
     summarise_energy,
     summarise_grid,
 )
+from .spot import cap_split, weighted_spot
 from .statistics import async_import_statistics
 
 _LOGGER = logging.getLogger(__name__)
@@ -64,6 +65,8 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self.entry = entry
         self._site_id = entry.data[CONF_SITE_ID]
+        # Last month's hourly prices do not change, so they are fetched once per month.
+        self._last_month_prices: tuple[Any, list[dict[str, Any]]] | None = None
         self._extended: dict[str, Any] = {}
         self._extended_at: datetime | None = None
         # (year, month) the extended values belong to; a new month starts empty
@@ -256,6 +259,17 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         result["prices_tomorrow"] = [b for b in tomorrow if b.get("spot") is not None]
         return result
 
+    async def _async_month_prices(
+        self, start: datetime, end: datetime, *, last_month: bool
+    ) -> list[dict[str, Any]]:
+        """The hourly prices of one month window (last month's are kept once they are fetched)."""
+        if last_month and self._last_month_prices and self._last_month_prices[0] == start:
+            return self._last_month_prices[1]
+        prices = await self.client.async_get_prices(self._site_id, start, end)
+        if last_month and prices:
+            self._last_month_prices = (start, prices)
+        return prices
+
     async def _async_month_charge_hours(
         self,
         site: int,
@@ -309,6 +323,7 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         energy: list[dict[str, Any]] = []
         charges: list[dict[str, Any]] = []
+        month_prices: dict[Any, list[dict[str, Any]]] = {}
         grid_responses: dict[str, dict[str, Any] | None] = {"": None, "_last_month": None}
         energy_ok = False
         this_month_ok = False
@@ -336,6 +351,14 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     raise
                 except AmperiumError as err:
                     _LOGGER.debug("Could not fetch hourly charges: %s", err)
+                try:
+                    month_prices[start] = await self._async_month_prices(
+                        start, end, last_month=start != this_start
+                    )
+                except AmperiumAuthError:
+                    raise
+                except AmperiumError as err:
+                    _LOGGER.debug("Could not fetch the hourly prices: %s", err)
         except AmperiumAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
 
@@ -353,6 +376,21 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             new.update(self._track_missing_hours(this_month, this_start, now))
         for suffix, response in grid_responses.items():
             new.update(summarise_grid(response, suffix))
+        # The consumption-weighted spot price, and what lies above the Norgespris ceiling, from
+        # the hourly prices of each month. Left out (the last good values stay) without prices.
+        for suffix, (start, end) in (
+            ("month", (this_start, hour_now)),
+            ("last_month", (prev_start, this_start)),
+        ):
+            prices = month_prices.get(start)
+            if not prices or end <= start:
+                continue
+            new[f"spot_avg_{suffix}"] = weighted_spot(energy, prices, start, end, now)
+            month_energy = [
+                b for b in energy
+                if isinstance(b.get("start"), datetime) and start <= b["start"] < end
+            ]
+            new[f"cap_detail_{suffix}"] = cap_split(month_energy, prices, now, tz)
         # The billing split of day/night kWh comes straight from Amperium
         # (gridRent); prefer it over our own hour-of-day classification.
         for api_key, own_key in (

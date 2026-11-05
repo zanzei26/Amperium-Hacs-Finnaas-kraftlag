@@ -115,13 +115,13 @@
         "name": "HAN signal"
       },
       "price_min_today": {
-        "name": "Spot price lowest today"
+        "name": "Lowest exchange price today"
       },
       "price_max_today": {
-        "name": "Spot price highest today"
+        "name": "Highest exchange price today"
       },
       "price_avg_today": {
-        "name": "Spot price average today"
+        "name": "Exchange price average today"
       },
       "han_signal_quality": {
         "name": "HAN signal quality",
@@ -253,6 +253,21 @@
       },
       "hours_missing_month": {
         "name": "Missing hours this month"
+      },
+      "price_min_today_incl": {
+        "name": "Lowest power price today incl. surcharge and VAT"
+      },
+      "price_max_today_incl": {
+        "name": "Highest power price today incl. surcharge and VAT"
+      },
+      "price_avg_today_incl": {
+        "name": "Power price average today incl. surcharge and VAT"
+      },
+      "spot_avg_month": {
+        "name": "Spot average this month"
+      },
+      "spot_avg_last_month": {
+        "name": "Spot average last month"
       }
     },
     "binary_sensor": {

@@ -25,6 +25,9 @@ class _PeriodClient:
         self.calls.append(("charges", site_id, start, end))
         return self.charges
 
+    async def async_get_prices(self, site_id, start, end):
+        return []                      # not recorded: these tests are about energy and charges
+
 
 def test_period_helper_asks_for_both_answers_for_the_same_window_and_adds_the_scheme():
     start, end, hours, charges = _sept_inputs()

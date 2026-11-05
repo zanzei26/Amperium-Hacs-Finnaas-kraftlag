@@ -22,6 +22,7 @@ Strømforbruk, kostnad og pris **direkte fra Finnås Kraftlag** via Amperium-pla
 - HAN-status hvert 5. minutt, siste data fra HAN-måleren og antall timer Amperium mangler data for (diagnostikk)
 - Live-strøm som kommer tilbake av seg selv, med status-sensor og handlingen `amperium.koble_til_live`
 - Strømregnskap: nettleie før støtte, fast månedspris, Norgespris og snittpris for forrige måned, og handlingen `amperium.hent_periode` for valgfrie perioder
+- Fra 0.16.0: forbruksvektet spotsnitt (denne og forrige måned), strømpris i dag inkl. påslag og mva, og Norgespris-taket som attributter (se README, «Spotsnitt»)
 - Fra 0.14.0: navn etter fakturaen. Handlingen `amperium.oppdater_navn` viser og kan bytte de gamle entitets-ID-ene (se README, «Navn og fakturaen»)
 
 ## Oppsett

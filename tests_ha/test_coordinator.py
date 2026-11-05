@@ -21,13 +21,14 @@ async def test_the_han_status_is_read_between_the_main_polls(hass, api, freezer,
     assert value(hass, entry, "han_online", "binary_sensor") == "on"
     sites_calls = [c for c in api.calls if c[1].startswith("/api/sites?")]
     api.han_online = False
+    calls_before = len(api.calls)
     with caplog.at_level(logging.INFO, logger=COORDINATOR):
         await advance(hass, freezer, dt.timedelta(minutes=5, seconds=1))   # the main poll is every 15 minutes
     assert value(hass, entry, "han_online", "binary_sensor") == "off"
     assert "the HAN module is now offline" in caplog.text
     new = [c for c in api.calls if c[1].startswith("/api/sites?")][len(sites_calls):]
     assert len(new) == 1                                         # one cheap call, not a full poll
-    assert not any("/prices" in c[1] for c in api.calls[-3:])
+    assert [c[1].split("?")[0] for c in api.calls[calls_before:]] == ["/api/sites"]   # nothing else
 
 
 async def test_a_han_status_that_did_not_change_writes_nothing_and_logs_nothing(hass, api, caplog):

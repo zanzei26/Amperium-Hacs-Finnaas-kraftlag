@@ -11,13 +11,14 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any
 
-from .api import AmperiumClient
+from .api import AmperiumAuthError, AmperiumClient, AmperiumError
 from .charges import (
     apply_cap,
     async_month_energy_before,
     async_uncapped_hourly_charges,
 )
 from .derived import summarise_period
+from .spot import period_price_fields
 
 
 async def async_period_summary(
@@ -41,5 +42,18 @@ async def async_period_summary(
     before = await async_month_energy_before(client, site_id, start, tz)
     capped = apply_cap(hourly, before + energy, now, tz)
     result = summarise_period(energy, {**charges, "energy": capped}, start, end, now, tz)
+    # The hourly prices are an extra (the weighted spot price, and Kraft rebuilt from the prices to
+    # compare with Amperium's): if they cannot be fetched the rest of the answer still stands.
+    try:
+        prices: list | None = await client.async_get_prices(site_id, start, end)
+    except AmperiumAuthError:
+        raise
+    except AmperiumError:
+        prices = None
+    fields, warnings = period_price_fields(
+        energy, prices, start, end, now, result.get("energy_gross"), result.get("fixed_monthly_price")
+    )
+    result.update(fields)
+    result["warnings"] = [*result["warnings"], *warnings]
     result["scheme"] = scheme
     return result
