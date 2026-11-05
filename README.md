@@ -167,6 +167,14 @@ Amperium-appen viser live effekt fra en egen sanntidsstrøm (RabbitMQ/AMQP). Fel
 - **Hull i timedata.** Hele måneden hentes på nytt hver time, og statistikken for Energidashbordet skrives om hver gang. En time som Amperium leverer i ettertid kommer derfor med av seg selv, og det er ikke noe mer å fylle inn herfra. Er en time aldri levert, finnes det heller ikke noe tall å vise, og integrasjonen finner ikke på noe. «Forbruk denne måneden» og de andre månedstallene fra Amperium er da for lave med dette forbruket. «Manglende timer denne måneden» teller hullene (inne i dataene, de to nyeste timene regnes ikke med), og loggen (nivå info) sier fra når timer mangler og når de kommer. En gang manglet to timer i Amperiums data selv flere timer etterpå, uten at det ble forklart.
 - Vil du varsles om at HAN-måleren har vært borte lenge, bruk «HAN-måler online» med `for:`, eller `now() - states('sensor.…han_siste_data')` større enn 90 minutter.
 
+### Sommer- og vintertid
+
+Når klokken stilles tilbake (siste søndag i oktober) har døgnet 25 timer, og når den stilles fram (siste søndag i mars) har det 23. De neste skiftene er 25. oktober 2026 og 28. mars 2027. Integrasjonen regner med faktiske tidspunkter og lokal dato og antar aldri 24 timer i et døgn. Det er testet på hele døgn og måneder rundt begge skiftene (`tests/test_dst.py`, 17 tester): forventet antall timer, «Forbruk i går», dag og natt, kapasitetstopper, statistikk og manglende timer blir riktige.
+
+**Observert 25. oktober 2026 (én installasjon):** Amperium ga 25 timer med forbruk, men bare 24 med kostnad. Kostnadsraden for den første 02:00–03:00-timen manglet. Den timen mangler da i alt som summeres fra timene: «Kraftpris og påslag denne måneden (sum av timene)», Norgespris-summen og kostnadsstatistikken til Energidashbordet. For en måned var det et par kroner. «Kraft» og «Totalt» bruker Amperiums egne totaler og har timen med. `amperium.hent_periode` varsler med `charge_hours_differ_from_consumption_hours`. Integrasjonen finner ikke på noe for en time som mangler.
+
+**Ikke avklart:** om Amperium sender 24 rader eller om to rader faller sammen hos oss (de rå svarene er ikke undersøkt), og hva Amperium sender for dagen med 23 timer. Et avvik gir en advarsel og ikke en feil. Kontroller 28. mars 2027 med `amperium.hent_periode` for den dagen.
+
 ### Kostnad: før støtte, støtte og totalt
 
 Amperiums månedstall er lettere å misforstå enn de ser ut til. Dette er hva tallene faktisk inneholder, utledet fra en ekte konto og kontrollert mot en ekte faktura (tallene er ikke publisert). **Det er ikke bekreftet av Amperium.**
@@ -211,6 +219,8 @@ data:
 - `warnings`: `period_not_over` (perioden er ikke ferdig, bare hele timer til nå er med), `hours_missing:N` (N timer mangler i svaret fra Amperium), `charge_hours_differ_from_consumption_hours`, `no_grid_rent_in_answer`, `period_spans_months`, `fixed_monthly_price_missing` (Amperium oppga ingen fast månedspris) og `fixed_monthly_price_not_in_energy_total` (totalsummen er ikke timene pluss den faste prisen, som ellers er det vanlige).
 
 **Testet mot faktura:** Handlingen for hele september ble kontrollert mot en ekte faktura i Home Assistant (v0.12.0): Kraft, nettleie før støtte, Norgespris-kompensasjon, sum, kWh og kr/kWh stemte med fakturaen innen 0–2 øre. Tallene er ikke publisert. Rettelsen i 0.12.1 (den faste månedsprisen er med én gang) er kontrollert i de automatiske testene, som bruker oppdiktede tall med samme oppbygning som fakturaen, men er ikke kjørt i Home Assistant.
+
+**Oktober 2026 (én faktura, Norgespris):** forbruk, nettleie og kapasitetsledd stemte. «Kraft» var litt høyere på fakturaen, og «Totalt» avvek med under 0,3 %. Amperiums Kraft-total lå om lag 0,3 øre/kWh under fakturaens spotgrunnlag, mens Amperiums Norgespris-tall passet med det. Årsaken er ikke funnet. Den er ikke avrunding i integrasjonen: «Kraft» er Amperiums egen total (se «Kostnad»), og timebeløpene fra Amperium er ikke avrundet. Septemberfakturaen stemte på øret, så avviket er ikke konstant. Bruk tallene som peiling og kontroller mot fakturaen.
 
 **Ikke avklart:** Amperiums beskrivelse av kostnadsoppgaven sier bare «total charges for a site in a given period». Den sier ikke hvordan den faste månedsprisen og kapasitetsleddet fordeles i en periode som ikke er en hel måned. Derfor oppgir handlingen dem hver for seg (`capacity_charge`, `fixed_monthly_price` og `grid_before_support_excl_capacity`) og advarer med `period_spans_months` når perioden går over et månedsskifte. For 30.08–01.10 er det observert 50 kr i fast månedspris (to måneder); kapasitetsleddet for en slik periode er ikke kontrollert mot en faktura. Kontroller tall for perioder som ikke er en hel måned mot en faktura før du bruker dem.
 
