@@ -28,6 +28,7 @@ async def test_hent_periode_for_september_matches_the_invoice(hass, api):
     assert out["grid_before_support"] == pytest.approx(1342.65, abs=0.005)   # Nettleie
     assert out["capacity_charge"] == 400.0
     assert out["norgespris_compensation"] == pytest.approx(2236.80, abs=0.005)
+    assert out["norgespris_kwh"] == pytest.approx(1788.520)                  # all of it got Norgespris
     assert out["house_cost_norgespris"] == pytest.approx(2325.35, abs=0.005)  # Totalt
     assert out["price_per_kwh_norgespris"] == pytest.approx(1.3002, abs=5e-5)
     assert "fixed_fee" not in out

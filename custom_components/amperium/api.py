@@ -374,6 +374,9 @@ class AmperiumClient:
                     "energy": _num(b.get("importedEnergyAmount")),
                     "tax": _num(b.get("salesTaxAmount")),
                     "norgespris": _num(b.get("importedCompensationAmountNorgespris")),
+                    # The kWh Amperium counted for the Norgespris compensation of this hour.
+                    # None when the field is missing (kept apart from a real 0).
+                    "norgespris_kwh": _opt(b.get("importedCompensationEnergyNorgespris")),
                 }
                 for b in data.get("energy") or []
                 if isinstance(b, dict)

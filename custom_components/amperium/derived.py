@@ -657,6 +657,10 @@ def _r(value: Any, digits: int) -> float | None:
     return None if value is None else round(float(value), digits)
 
 
+# Rounding noise between the two kWh figures is not a warning (kWh).
+NORGESPRIS_KWH_TOLERANCE = 0.5
+
+
 def summarise_period(
     energy: list[dict[str, Any]],
     charges: dict[str, Any] | None,
@@ -688,6 +692,12 @@ def summarise_period(
     hourly_energy = sum(b["energy"] for b in charge_hours) if charge_hours else None
     vat_hourly = sum(b["tax"] for b in charge_hours) if charge_hours else None
     norgespris = sum(b["norgespris"] for b in charge_hours) if charge_hours else None
+    # The kWh that got Norgespris compensation, and the consumption in the same hours (the two
+    # are only comparable over the hours that have a cost row, which is not always every hour).
+    counted = [b["norgespris_kwh"] for b in charge_hours if b.get("norgespris_kwh") is not None]
+    norgespris_kwh = sum(counted) if counted else None
+    charge_starts = {b["start"] for b in charge_hours}
+    kwh_in_charge_hours = sum(b["import"] for b in hours if b["start"] in charge_starts)
 
     grid = charges.get("grid") or {}
     grid_after = grid.get("total")
@@ -714,6 +724,14 @@ def summarise_period(
         warnings.append(f"hours_missing:{expected - len(hours)}")
     if len(charge_hours) != len(hours):
         warnings.append("charge_hours_differ_from_consumption_hours")
+    if (
+        norgespris_kwh is not None
+        and norgespris_kwh > 0
+        and kwh_in_charge_hours - norgespris_kwh > NORGESPRIS_KWH_TOLERANCE
+    ):
+        # Not all the consumption got Norgespris compensation: either a ceiling was reached or
+        # hours with a spot price under Norgespris do not count. Which one is not confirmed.
+        warnings.append("norgespris_kwh_below_consumption")
     if not grid:
         warnings.append("no_grid_rent_in_answer")
     if fixed is None:
@@ -752,6 +770,7 @@ def summarise_period(
         ),
         "fixed_monthly_price": _r(fixed, 2),
         "norgespris_compensation": _r(norgespris, 2),
+        "norgespris_kwh": _r(norgespris_kwh, 3),
         "house_cost_norgespris": _r(cost_norgespris, 2),
         "house_cost_subsidy": _r(cost_subsidy, 2),
         "price_per_kwh_norgespris": _r(price_per_kwh(cost_norgespris, kwh), 4),

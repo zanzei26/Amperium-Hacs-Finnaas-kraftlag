@@ -179,7 +179,8 @@ class FakeAmperium:
                 {"from": iso(h), "to": iso(h + dt.timedelta(hours=1)),
                  "importedEnergyAmount": SEPT_HOURLY_ENERGY / SEPT_HOURS,
                  "salesTaxAmount": SEPT_HOURLY_VAT / SEPT_HOURS,
-                 "importedCompensationAmountNorgespris": SEPT_NORGESPRIS / SEPT_HOURS}
+                 "importedCompensationAmountNorgespris": SEPT_NORGESPRIS / SEPT_HOURS,
+                 "importedCompensationEnergyNorgespris": SEPT_KWH / SEPT_HOURS}
                 for h in hours
             ],
             # Energy incl. the fixed monthly price (Kraft 3219.50) plus the grid rent after subsidy.
@@ -207,7 +208,8 @@ class FakeAmperium:
                 {"from": iso(h), "to": iso(h + dt.timedelta(hours=1)),
                  "importedEnergyAmount": self.oct_hourly_energy,
                  "salesTaxAmount": self.oct_hourly_energy * 0.2,
-                 "importedCompensationAmountNorgespris": 0.6}
+                 "importedCompensationAmountNorgespris": 0.6,
+                 "importedCompensationEnergyNorgespris": self.oct_hourly_kwh}
                 for h in hours
             ],
             "totalAmount": energy + self.oct_fixed + grid_after,
