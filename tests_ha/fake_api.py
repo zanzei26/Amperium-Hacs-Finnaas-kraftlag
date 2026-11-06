@@ -24,7 +24,7 @@ SEPT_START = dt.datetime(2026, 8, 31, 22, tzinfo=UTC)  # 1 Sept 00:00 Europe/Osl
 SEPT_END = dt.datetime(2026, 9, 30, 22, tzinfo=UTC)  # 1 Oct 00:00 Europe/Oslo
 SEPT_HOURS = 720
 SEPT_KWH = 1788.520
-SEPT_HOURLY_ENERGY = 3110.40 + 84.10  # kraftpris + påslag, per month
+SEPT_HOURLY_ENERGY = 3131.06 + 63.44  # kraftpris + påslag, per month (the sum is the invoice's 3194.50)
 SEPT_HOURLY_VAT = 643.90 - 5.00  # the VAT in the hours (the 5.00 on the fixed price is not in them)
 SEPT_NORGESPRIS = 2236.80
 SEPT_GRID_AFTER = -112.40
@@ -32,8 +32,10 @@ SEPT_SUBSIDY = 1342.65 + 112.40  # derived: nettleie 1342.65 = after + subsidy
 SEPT_FIXED = 25.0
 # Hourly prices (ex VAT, per kWh) that add up to the invoice's Kraftpris and Spot påslag, so the
 # Kraft rebuilt from the prices equals the invoice's Kraft (3219.50) in the September tests.
-SEPT_SPOT_EX_VAT = 3110.40 / 1.25 / SEPT_KWH
-SEPT_SURCHARGE_EX_VAT = 84.10 / 1.25 / SEPT_KWH
+# The split is chosen so that Norgespris (spot incl. VAT - 0.50 per kWh) equals the invoice's 2236.80 too:
+# Kraftpris 3131.06 - 0.50 x 1788.52 kWh = 2236.80, and the Spot påslag is what is left of 3194.50.
+SEPT_SPOT_EX_VAT = 3131.06 / 1.25 / SEPT_KWH
+SEPT_SURCHARGE_EX_VAT = 63.44 / 1.25 / SEPT_KWH
 
 # --- October 2026, up to "now" (2 October 12:30 Oslo) ---------------------------------------
 OCT_START = dt.datetime(2026, 9, 30, 22, tzinfo=UTC)  # 1 Oct 00:00 Europe/Oslo
@@ -43,6 +45,11 @@ NOW = dt.datetime(2026, 10, 2, 10, 30, tzinfo=UTC)  # 12:30 Oslo (summer time)
 def iso(moment: dt.datetime) -> str:
     """The API's time format."""
     return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def spot_incl(hour: dt.datetime) -> float:
+    """The default (October) spot price of an hour incl. 25 % VAT: (0.5 + 0.01 x the UTC hour) x 1.25."""
+    return (0.5 + hour.hour * 0.01) * 1.25
 
 
 def hours_between(start: dt.datetime, end: dt.datetime) -> list[dt.datetime]:
@@ -70,7 +77,8 @@ class FakeAmperium:
         self.oct_fixed = 25.0
         # Norgespris per kWh, and where Amperium cuts one request short: it stops adding
         # compensation after about this many kWh counted from the start of the request (None = never).
-        self.oct_comp_per_kwh = 0.3
+        # None: the hour's own compensation (spot incl. VAT - 0.50), so the figures agree with the prices.
+        self.oct_comp_per_kwh: float | None = None
         self.amperium_cut_kwh: float | None = 4000.0
         # Answer 500 to a charges request shorter than 30 hours (the pieces of a long month).
         self.fail_short_charge_windows = False
@@ -236,12 +244,12 @@ class FakeAmperium:
             if self.amperium_cut_kwh is not None:
                 share = min(1.0, max(0.0, (self.amperium_cut_kwh - counted) / self.oct_hourly_kwh))
                 counted += self.oct_hourly_kwh
+            rate = spot_incl(h) - 0.50 if self.oct_comp_per_kwh is None else self.oct_comp_per_kwh
             rows.append(
                 {"from": iso(h), "to": iso(h + dt.timedelta(hours=1)),
                  "importedEnergyAmount": self.oct_hourly_energy,
                  "salesTaxAmount": self.oct_hourly_energy * 0.2,
-                 "importedCompensationAmountNorgespris":
-                     self.oct_comp_per_kwh * self.oct_hourly_kwh * share,
+                 "importedCompensationAmountNorgespris": rate * self.oct_hourly_kwh * share,
                  "importedCompensationEnergyNorgespris": self.oct_hourly_kwh * share}
             )
         return {

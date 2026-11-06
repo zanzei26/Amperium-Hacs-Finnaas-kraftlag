@@ -14,6 +14,14 @@ from .charges import NORGESPRIS_CAP_KWH, cap_shares
 from .derived import _parse_iso, complete_hours, vat_with_fixed_price
 
 MAX_LISTED_HOURS = 48
+# What Norgespris costs per kWh incl. VAT; the compensation of an hour is kWh x (spot incl. VAT - this).
+# It is negative in an hour where the spot price is lower (Amperium's own hourly figures do that too).
+NORGESPRIS_KR_KWH = 0.50
+# A Norgespris rebuilt from the prices that is further from Amperium's than this (kr, or this share
+# of Amperium's amount, whichever is larger) is not trusted: then the rate or the rules are not the
+# ones assumed. A margin that was chosen, not measured; the real difference seen so far is 0.34 kr.
+NORGESPRIS_TOLERANCE_KR = 5.0
+NORGESPRIS_TOLERANCE_SHARE = 0.01
 # A difference between Amperium's Kraft and the one rebuilt from the prices over this (kr) is a warning.
 KRAFT_DEVIATION_WARNING = 1.0
 
@@ -178,6 +186,55 @@ def kraft_from_prices(
     gross = avg["sum_spot_inkl_mva"] + avg["sum_paslag_inkl_mva"]
     kraft = gross + fixed
     return kraft, vat_with_fixed_price(avg["sum_mva"], gross, fixed)
+
+
+def norgespris_from_prices(
+    energy: list[dict[str, Any]],
+    prices: list[dict[str, Any]] | None,
+    start: dt.datetime,
+    end: dt.datetime,
+    now: dt.datetime,
+    tz: dt.tzinfo,
+    cap_kwh: float = NORGESPRIS_CAP_KWH,
+) -> tuple[float, float] | None:
+    """The Norgespris compensation of [start, end) rebuilt from the prices, or None.
+
+    Returns ``(compensation in kr, kWh under the month's ceiling)``. Each hour counts
+    kWh x its share under the ceiling x (spot incl. VAT - 0.50), the first ``cap_kwh`` of each
+    local month in the order the hours came. ``energy`` must hold the consumption from the 1st of
+    each month the period touches. Like ``kraft_from_prices`` it needs every hour of the period to
+    have consumption and a price, so nothing is made up. Whether to trust it against Amperium's own
+    figure is ``trusted_norgespris``.
+    """
+    if prices is None:
+        return None
+    avg = weighted_spot(energy, prices, start, end, now)
+    if avg["kwh"] <= 0 or avg["timer"] != expected_hours(start, end, now):
+        return None
+    index = price_index(prices)
+    krone = under = 0.0
+    for hour, (frac, kwh) in cap_shares(energy, now, tz, cap_kwh).items():
+        if not start <= hour < end:
+            continue
+        price = index.get(hour)
+        if price is None:
+            return None
+        spot_incl = price["spot"] * (1 + price["vat"] / 100)
+        krone += kwh * frac * (spot_incl - NORGESPRIS_KR_KWH)
+        under += kwh * frac
+    return krone, under
+
+
+def trusted_norgespris(amperium: float | None, rebuilt: tuple[float, float] | None) -> bool:
+    """Is the Norgespris rebuilt from the prices close enough to Amperium's to be used instead?
+
+    Without an Amperium figure to compare with (it is unknown) it is not used: the sensor then stays
+    unknown rather than show a number that rests on an assumed rate.
+    """
+    if amperium is None or rebuilt is None:
+        return False
+    margin = max(NORGESPRIS_TOLERANCE_KR, NORGESPRIS_TOLERANCE_SHARE * abs(amperium))
+    return abs(rebuilt[0] - amperium) <= margin
 
 
 def period_price_fields(

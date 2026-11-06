@@ -978,10 +978,13 @@ class AmperiumSensor(CoordinatorEntity[AmperiumCoordinator], SensorEntity):
             return _spot_attributes(data.get("spot_avg_month"))
         if key == "spot_avg_last_month":
             return _spot_attributes(data.get("spot_avg_last_month"))
-        if key == "norgespris_month":
-            return _cap_attributes(data.get("cap_detail_month"))
-        if key == "norgespris_last_month":
-            return _cap_attributes(data.get("cap_detail_last_month"))
+        if key in ("norgespris_month", "norgespris_last_month"):
+            suffix = key.removeprefix("norgespris_")
+            attrs = dict(_cap_attributes(data.get(f"cap_detail_{suffix}")) or {})
+            if data.get(f"norgespris_{suffix}_source") is not None:
+                attrs["kilde"] = data.get(f"norgespris_{suffix}_source")
+                attrs["fra_amperium"] = _round(data.get(f"norgespris_{suffix}_amperium"), 2)
+            return attrs or None
         return None
 
 

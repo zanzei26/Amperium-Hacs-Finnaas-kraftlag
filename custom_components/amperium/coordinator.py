@@ -45,7 +45,13 @@ from .derived import (
     summarise_energy,
     summarise_grid,
 )
-from .spot import cap_split, kraft_from_prices, weighted_spot
+from .spot import (
+    cap_split,
+    kraft_from_prices,
+    norgespris_from_prices,
+    trusted_norgespris,
+    weighted_spot,
+)
 from .statistics import async_import_statistics
 
 _LOGGER = logging.getLogger(__name__)
@@ -406,6 +412,22 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if rebuilt is not None:
                 new["cost_energy_last_month"] = rebuilt[0]
                 new["cost_last_month"] = rebuilt[0] + new["cost_grid_rent_last_month"]
+        # The Norgespris compensation of a month is rebuilt from the prices in the same way: Amperium's
+        # hourly figures leave out the hours around a clock change. It is only used when it is close to
+        # Amperium's own (see spot.trusted_norgespris) and every hour has consumption and a price.
+        for suffix, (start, end) in (
+            ("month", (this_start, hour_now)),
+            ("last_month", (prev_start, this_start)),
+        ):
+            amperium_np = new.get(f"norgespris_{suffix}")
+            if amperium_np is None or end <= start:
+                continue
+            rebuilt_np = norgespris_from_prices(energy, month_prices.get(start), start, end, now, tz)
+            new[f"norgespris_{suffix}_amperium"] = amperium_np
+            use = trusted_norgespris(amperium_np, rebuilt_np)
+            new[f"norgespris_{suffix}_source"] = "priser" if use else "amperium"
+            if use:
+                new[f"norgespris_{suffix}"] = rebuilt_np[0]
         # The billing split of day/night kWh comes straight from Amperium
         # (gridRent); prefer it over our own hour-of-day classification.
         for api_key, own_key in (

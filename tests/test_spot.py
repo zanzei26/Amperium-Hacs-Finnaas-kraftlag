@@ -363,3 +363,163 @@ def test_kraft_from_the_prices_is_used_for_october_when_called_the_way_the_coord
     # one hour short, as it would be if a price were missing, is still refused
     assert spot.kraft_from_prices(cons[:-1], series, first, after,
                                   dt.datetime(2026, 11, 5, tzinfo=UTC), 25.0) is None
+
+
+# --- Norgespris rebuilt from the prices -------------------------------------------------------------
+
+def test_norgespris_from_the_prices_is_kwh_times_spot_incl_vat_minus_50_ore():
+    # 2 kWh at spot 1.0 -> 1.25 incl. VAT, 2 kWh at spot 2.0 -> 2.50
+    out = spot.norgespris_from_prices(energy([2, 2]), prices([1.0, 2.0]), START, START + 2 * HOUR, NOW, OSLO)
+    assert out == pytest.approx((2 * 0.75 + 2 * 2.0, 4.0))
+
+
+def test_an_hour_with_a_spot_price_under_norgespris_gives_a_negative_compensation_like_amperiums_own():
+    # 0.2 + 25 % VAT = 0.25, which is 0.25 under the 0.50 Norgespris
+    out = spot.norgespris_from_prices(energy([2]), prices([0.2]), START, START + HOUR, NOW, OSLO)
+    assert out[0] == pytest.approx(-0.5)
+
+
+def test_the_example_of_5600_kwh_in_a_month_gives_the_first_5000_kwh_norgespris():
+    """100 kWh an hour for 56 hours at a spot price of 1.80 incl. VAT (1.44 ex VAT)."""
+    cons, series = energy([100.0] * 56), prices([1.80 / 1.25] * 56, surcharge=0.049 / 1.25)
+    end = START + 56 * HOUR
+    krone, under = spot.norgespris_from_prices(cons, series, START, end, NOW, OSLO)
+    assert under == pytest.approx(5000.0)
+    assert krone == pytest.approx(5000 * (1.80 - 0.50))                    # 6 500.00
+    kraft, _vat = spot.kraft_from_prices(cons, series, START, end, NOW, 25.0)
+    assert kraft == pytest.approx(5600 * (1.80 + 0.049) + 25.0)            # 10 379.40
+    assert kraft - krone == pytest.approx(3879.40, abs=0.005)               # Kraft - Norgespris
+
+
+def test_the_hour_that_crosses_the_ceiling_gets_the_part_under_it():
+    cons, series = energy([800.0] * 7), prices([1.0] * 7)                  # 5 600 kWh; hour 7 starts at 4 800
+    krone, under = spot.norgespris_from_prices(cons, series, START, START + 7 * HOUR, NOW, OSLO)
+    assert under == pytest.approx(5000.0)                                  # 200 of the last 800 kWh
+    assert krone == pytest.approx(5000 * 0.75)
+
+
+def test_a_period_in_the_middle_of_the_month_counts_the_ceiling_from_the_1st():
+    cons, series = energy([100.0] * 56), prices([1.0] * 56)
+    # the period is the last 10 hours; the 46 hours before it have used 4 600 kWh
+    start, end = START + 46 * HOUR, START + 56 * HOUR
+    krone, under = spot.norgespris_from_prices(cons, series[46:], start, end, NOW, OSLO)
+    assert under == pytest.approx(400.0)                                    # 4 600 + 400 = 5 000
+    assert krone == pytest.approx(400 * 0.75)
+
+
+@pytest.mark.parametrize("case", ["no prices", "a price missing", "a consumption hour missing", "no consumption"])
+def test_norgespris_from_the_prices_needs_every_hour_to_have_consumption_and_a_price(case):
+    cons, series = energy([2, 2]), prices([1.0, 2.0])
+    if case == "no prices":
+        series = None
+    elif case == "a price missing":
+        series = series[:1]
+    elif case == "a consumption hour missing":
+        cons = cons[:1]
+    elif case == "no consumption":
+        cons = energy([0, 0])
+    assert spot.norgespris_from_prices(cons, series, START, START + 2 * HOUR, NOW, OSLO) is None
+
+
+def test_norgespris_from_the_prices_counts_all_25_hours_of_the_day_with_the_clock_change():
+    day = dt.datetime(2026, 10, 25, tzinfo=OSLO).astimezone(UTC)
+    end = dt.datetime(2026, 10, 26, tzinfo=OSLO).astimezone(UTC)
+    krone, under = spot.norgespris_from_prices(energy([2.0] * 25, day), prices([1.0] * 25, day), day, end, NOW, OSLO)
+    assert under == pytest.approx(50.0) and krone == pytest.approx(25 * 2 * 0.75)
+
+
+def test_norgespris_from_the_prices_works_for_october_with_local_time_ends():
+    first, after = dt.datetime(2026, 10, 1, tzinfo=OSLO), dt.datetime(2026, 11, 1, tzinfo=OSLO)
+    start = first.astimezone(UTC)
+    out = spot.norgespris_from_prices(energy([3.0] * 745, start), prices([1.0] * 745, start), first, after,
+                                      dt.datetime(2026, 11, 5, tzinfo=UTC), OSLO)
+    assert out is not None and out[1] == pytest.approx(2235.0)
+
+
+def test_amperiums_norgespris_is_only_replaced_when_the_rebuilt_one_is_close_to_it():
+    rebuilt = (2500.51, 1800.0)
+    assert spot.trusted_norgespris(2500.17, rebuilt)                        # 0.34 kr apart: the clock change
+    assert spot.trusted_norgespris(2500.51 + 20, rebuilt)                   # inside 1 % of a large amount
+    assert not spot.trusted_norgespris(2500.51 + 40, rebuilt)               # over 1 %: other rate or rules
+    assert spot.trusted_norgespris(1.0, (5.9, 4.0))                         # small amounts: 5 kr margin
+    assert not spot.trusted_norgespris(1.0, (6.1, 4.0))
+    assert not spot.trusted_norgespris(None, rebuilt)                       # unknown stays unknown
+    assert not spot.trusted_norgespris(2500.17, None)
+
+
+def _np_client(amperium_total):
+    """Two hours of 2 kWh at spot 1.0 and 2.0 (rebuilt Norgespris 5.5); Amperium's rows add up to ``amperium_total``."""
+    class Client:
+        async def async_get_energy(self, site_id, start, end):
+            return energy([2, 2])
+
+        async def async_get_charges(self, site_id, start, end):
+            return {
+                "energy": [{"start": START + i * HOUR, "end": START + (i + 1) * HOUR, "energy": 1.0,
+                            "tax": 0.2, "norgespris": amperium_total / 2, "norgespris_kwh": 2.0} for i in range(2)],
+                "outer_total": 32.0, "fixed_total": 25.0,
+                "grid": {"total": 5.0, "compensation": 1.0, "capacity_amount": 0.0, "capacity_avg_kw": 1.0},
+            }
+
+        async def async_get_prices(self, site_id, start, end):
+            return prices([1.0, 2.0])
+
+    return Client()
+
+
+def test_the_period_uses_norgespris_from_the_prices_and_keeps_amperiums_figure():
+    out = _run(_np_client(5.5 - 0.34))                                      # Amperium 0.34 kr under
+    assert out["norgespris_kilde"] == "priser"
+    assert out["norgespris_compensation"] == pytest.approx(5.5, abs=0.005)
+    assert out["norgespris_compensation_amperium"] == pytest.approx(5.16, abs=0.005)
+    assert out["norgespris_avvik_fra_priser"] == pytest.approx(-0.34, abs=0.005)
+    assert out["norgespris_kwh"] == pytest.approx(4.0)
+    # the total follows: Kraft + Nettleie before support - Norgespris
+    assert out["house_cost_norgespris"] == pytest.approx(
+        out["energy_gross"] + 5.0 + 1.0 - 5.5, abs=0.01)
+    assert not any(w.startswith("norgespris_") for w in out["warnings"])    # 0.34 kr is not worth a warning
+
+
+def test_a_difference_over_a_krone_in_norgespris_is_a_warning_but_still_used():
+    out = _run(_np_client(5.5 - 3.0))
+    assert out["norgespris_kilde"] == "priser" and "norgespris_fra_priser_brukt" in out["warnings"]
+
+
+def test_a_norgespris_far_from_amperiums_is_not_used_and_says_so():
+    out = _run(_np_client(5.5 + 60.0))                                      # beyond the 5 kr margin
+    assert out["norgespris_kilde"] == "amperium"
+    assert out["norgespris_compensation"] == pytest.approx(65.5, abs=0.005)  # Amperium's, untouched
+    assert "norgespris_avviker_fra_priser" in out["warnings"]
+    assert out["norgespris_avvik_fra_priser"] == pytest.approx(60.0, abs=0.005)
+
+
+def test_a_period_in_the_middle_of_a_month_counts_the_ceiling_from_the_1st_also_for_norgespris_from_prices():
+    """46 hours of 100 kWh have passed when the period starts, so only 400 kWh of its 1 000 are under 5 000."""
+    import asyncio
+
+    from conftest import period
+
+    all_energy = energy([100.0] * 56)
+    all_prices = prices([1.0] * 56)
+    first, last = START + 46 * HOUR, START + 56 * HOUR
+
+    class Client:
+        async def async_get_energy(self, site_id, start, end):
+            return [b for b in all_energy if start <= b["start"] < end]
+
+        async def async_get_charges(self, site_id, start, end):
+            return {
+                "energy": [{"start": b["start"], "end": b["end"], "energy": 100.0, "tax": 20.0,
+                            "norgespris": 100 * 0.75, "norgespris_kwh": 100.0}
+                           for b in all_energy if start <= b["start"] < end],
+                "outer_total": 1025.0, "fixed_total": 25.0,
+                "grid": {"total": 0.0, "compensation": 0.0, "capacity_amount": 0.0, "capacity_avg_kw": 1.0},
+            }
+
+        async def async_get_prices(self, site_id, start, end):
+            return all_prices[46:]                       # the prices of the period's own 10 hours
+
+    out = asyncio.run(period.async_period_summary(Client(), 1, first, last, OSLO, "norgespris", now=NOW))
+    assert out["norgespris_kilde"] == "priser"
+    assert out["norgespris_compensation"] == pytest.approx(400 * 0.75)
+    assert out["norgespris_kwh"] == pytest.approx(400.0)
