@@ -92,6 +92,9 @@ DEFAULT_DAY_END = 22
 # Extended data (hourly consumption/charges, support comparison) is heavier,
 # so it is fetched less often than the main data.
 EXTENDED_SCAN_INTERVAL = 3600
+# New consumption data from Amperium (``updated`` changed) makes the hourly read run sooner, but not
+# more often than this (seconds).
+EXTENDED_MIN_INTERVAL = 600
 
 # Default request timeout (seconds)
 REQUEST_TIMEOUT = 30

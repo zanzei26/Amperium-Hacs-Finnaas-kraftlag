@@ -73,7 +73,17 @@ class FakeAmperium:
         self.energy_updated_on = "2026-10-02T09:00:00Z"
         # October sites figures (the API's own month totals).
         self.oct_hourly_kwh = 2.0
-        self.oct_hourly_energy = 1.5
+        # None: each hour's amount follows the hour's own price, kWh x (spot + 0.05) x 1.25, so the cost
+        # figures agree with the prices. A number gives every hour that amount.
+        self.oct_hourly_energy: float | None = None
+        # What /api/sites is ahead of the hourly figures by (kr and kWh), to see that the month's
+        # sensors do not take their totals from it.
+        self.sites_skew_kr = 0.0
+        self.sites_skew_kwh = 0.0
+        self.sites_skew_grid_kr = 0.0
+        # How far under the hours and prices Amperium's energy total for this month is (a real month with
+        # a clock change was 7.54 kr under).
+        self.oct_total_deficit = 0.0
         self.oct_fixed = 25.0
         # Norgespris per kWh, and where Amperium cuts one request short: it stops adding
         # compensation after about this many kWh counted from the start of the request (None = never).
@@ -149,10 +159,16 @@ class FakeAmperium:
         return [h for h in hours_between(OCT_START, NOW.replace(minute=0, second=0))
                 if h not in self.missing_hours]
 
+    def oct_amount(self, hour: dt.datetime) -> float:
+        """The energy amount (incl. VAT) of one October hour."""
+        if self.oct_hourly_energy is not None:
+            return self.oct_hourly_energy
+        return self.oct_hourly_kwh * (0.5 + hour.hour * 0.01 + 0.05) * 1.25
+
     def _site(self) -> dict[str, Any]:
         hours = self._oct_hours()
-        kwh = len(hours) * self.oct_hourly_kwh
-        energy = len(hours) * self.oct_hourly_energy + self.oct_fixed  # the fixed price is in it
+        kwh = len(hours) * self.oct_hourly_kwh + self.sites_skew_kwh
+        energy = sum(self.oct_amount(h) for h in hours) + self.oct_fixed + self.sites_skew_kr  # fixed price inside
         grid_after = 120.0
         return {
             "siteId": SITE_ID, "siteName": SITE_NAME,
@@ -163,8 +179,8 @@ class FakeAmperium:
                 "energyImportToday": 20.0, "energyUpdatedOn": self.energy_updated_on,
             },
             "chargesForCurrentMonth": {
-                "totalAmount": energy + grid_after, "amountEnergy": energy,
-                "amountGridRent": grid_after,
+                "totalAmount": energy + grid_after + self.sites_skew_grid_kr, "amountEnergy": energy,
+                "amountGridRent": grid_after + self.sites_skew_grid_kr,
             },
             "currentEnergyPrice": {"spotOfficial": 0.5, "spotPreliminary": 0.5, "surcharge": 0.05,
                                    "salesTaxPercentage": 25},
@@ -235,7 +251,7 @@ class FakeAmperium:
     def _charges_october(self, start: dt.datetime, end: dt.datetime) -> dict[str, Any]:
         hours = [h for h in hours_between(start, end)
                  if h not in self.missing_hours and h < NOW.replace(minute=0, second=0)]
-        energy = len(hours) * self.oct_hourly_energy
+        energy = sum(self.oct_amount(h) for h in hours)
         grid_after = 120.0
         rows = []
         counted = 0.0
@@ -247,14 +263,14 @@ class FakeAmperium:
             rate = spot_incl(h) - 0.50 if self.oct_comp_per_kwh is None else self.oct_comp_per_kwh
             rows.append(
                 {"from": iso(h), "to": iso(h + dt.timedelta(hours=1)),
-                 "importedEnergyAmount": self.oct_hourly_energy,
-                 "salesTaxAmount": self.oct_hourly_energy * 0.2,
+                 "importedEnergyAmount": self.oct_amount(h),
+                 "salesTaxAmount": self.oct_amount(h) * 0.2,
                  "importedCompensationAmountNorgespris": rate * self.oct_hourly_kwh * share,
                  "importedCompensationEnergyNorgespris": self.oct_hourly_kwh * share}
             )
         return {
             "energy": rows,
-            "totalAmount": energy + self.oct_fixed + grid_after,
+            "totalAmount": energy + self.oct_fixed + grid_after - self.oct_total_deficit,
             "gridRent": {
                 "totalAmount": grid_after, "compensationAmount": 40.0,
                 "capacityChargeAveragePower": 6.5,
