@@ -21,9 +21,9 @@ Sensorer per anlegg:
 | `sensor.*_forbruk_denne_maneden` | Forbruk hittil i måneden (kWh) |
 | `sensor.*_forbruk_i_dag` | Forbruk i dag (kWh) |
 | `sensor.*_effekt_na` | Effekt nå (kW). Følger din egen effektsensor hvis du har valgt en, ellers Amperiums verdi (oppdateres en gang i timen) |
-| «Kraft denne måneden» | Kraft hittil i måneden, brutto inkl. mva, før støtte (kr), fra månedstallene. **Inkl. den faste månedsprisen** (25 kr). Fakturaens «Kraft» |
+| «Kraft denne måneden» | Kraft hittil i måneden, brutto inkl. mva, før støtte (kr). **Inkl. den faste månedsprisen** (25 kr). Fakturaens «Kraft». Fra 0.17.0 fra samme lesing som timetallene (attributtet `til` sier hvor langt den gjelder; se «Denne måneden: ett øyeblikksbilde»), bygget fra timeprisene når alle timer har pris, ellers Amperiums sum. Før 0.17.0 kom den fra `/api/sites` |
 | «Nettleie etter straumstøtte denne måneden» | Nettleie inkl. kapasitetsledd, **etter** straumstøtte (kr). Nettleien har ikke noe fastledd |
-| «Kraft + Nettleie etter straumstøtte denne måneden» | Kraft (inkl. fast månedspris) + nettleie som over (kr). Dette er Amperiums eget månedstall |
+| «Kraft + Nettleie etter straumstøtte denne måneden» | Kraft (inkl. fast månedspris) + nettleie som over (kr). Fra 0.17.0 summen av de to tallene fra samme lesing; før det Amperiums eget månedstall fra `/api/sites` |
 | «Kraft forrige måned», «Nettleie etter straumstøtte forrige måned», «Kraft + Nettleie etter straumstøtte forrige måned» | De samme tre tallene for forrige måned (kr). Fra 0.16.1 (for måneder med klokkeskifte fra 0.16.2) er Kraft bygget fra timeprisene når alle timer har forbruk og pris, ellers er det Amperiums tall; attributtet `kilde` sier hvilket, og `fra_amperium` viser Amperiums eget tall. Se «Spotsnitt» |
 | «Nettleie før straumstøtte forrige måned» | Nettleie inkl. kapasitetsledd, før støtte (kr) for forrige måned: «Nettleie etter straumstøtte» + støtten. Postene ligger som attributter |
 | «Straumstøtte forrige måned» | Støtten som er trukket fra nettleien i månedstallene (kr). Gjelder ikke på Norgespris |
@@ -121,7 +121,7 @@ Integrasjonen importerer **timeforbruk** (og energikostnad, og eksport hvis du h
 Noen ting å vite:
 - Statistikken fylles ut for forrige og inneværende måned første gang. Eldre historikk importeres ikke.
 - Tallene kommer med forsinkelse fra Amperium (HAN-måleren oppdateres time for time), så siste time kan mangle en stund.
-- `Amperium energikostnad (brutto)` er brutto energikostnad (spot + påslag inkl. mva) **før** straumstøtte/Norgespris, og **uten nettleie**. Nettleie finnes bare i månedstallene fra `/api/sites`.
+- `Amperium energikostnad (brutto)` er brutto energikostnad (spot + påslag inkl. mva) **før** straumstøtte/Norgespris, og **uten nettleie**. Nettleie finnes bare i månedstallene (fra 0.17.0 fra kostnadssvaret for samme timer som de andre hittil-tallene; før det fra `/api/sites`).
 
 ### Forbruk og pris per time (graf)
 
@@ -164,7 +164,7 @@ Amperium-appen viser live effekt fra en egen sanntidsstrøm (RabbitMQ/AMQP). Fel
 - **Status hvert 5. minutt.** «HAN-måler online», «HAN-signal» og «HAN siste data» leses hvert 5. minutt (med samme kall som hovedhentingen, som går hvert 15. minutt). Før kunne et utfall på under 15 minutter forsvinne mellom to lesninger. Appen viser mer fordi den spør oftere. Hvert skifte mellom online og offline står i loggen (nivå info).
 - **Signalet er et nivå fra 0 til 4**, ikke dBm. Amperium gir ikke dBm. «HAN-signal» viser nivået og «HAN-signalkvalitet» navnet på det.
 - **Det går ikke an å koble HAN-modulen til igjen herfra.** Online-status er modulens egen forbindelse til Amperium-skyen (Wi-Fi eller mobil), og Amperium har ikke noe kall for å starte den på nytt. Integrasjonen har derfor ingen «reconnect» mot modulen. Står den på «Dårlig» eller «Ingen signal», hjelper det å flytte den, for eksempel ut av et metallskap.
-- **Hull i timedata.** Hele måneden hentes på nytt hver time, og statistikken for Energidashbordet skrives om hver gang. En time som Amperium leverer i ettertid kommer derfor med av seg selv, og det er ikke noe mer å fylle inn herfra. Er en time aldri levert, finnes det heller ikke noe tall å vise, og integrasjonen finner ikke på noe. «Forbruk denne måneden» og de andre månedstallene fra Amperium er da for lave med dette forbruket. «Manglende timer denne måneden» teller hullene (inne i dataene, de to nyeste timene regnes ikke med), og loggen (nivå info) sier fra når timer mangler og når de kommer. En gang manglet to timer i Amperiums data selv flere timer etterpå, uten at det ble forklart.
+- **Hull i timedata.** Hele måneden hentes på nytt hver time (fra 0.17.0 også når Amperium melder nye forbruksdata, med minst 10 minutter mellom hver gang), og statistikken for Energidashbordet skrives om hver gang. En time som Amperium leverer i ettertid kommer derfor med av seg selv, og det er ikke noe mer å fylle inn herfra. Er en time aldri levert, finnes det heller ikke noe tall å vise, og integrasjonen finner ikke på noe. «Forbruk denne måneden» og de andre månedstallene fra Amperium er da for lave med dette forbruket. «Manglende timer denne måneden» teller hullene (inne i dataene, de to nyeste timene regnes ikke med), og loggen (nivå info) sier fra når timer mangler og når de kommer. En gang manglet to timer i Amperiums data selv flere timer etterpå, uten at det ble forklart.
 - Vil du varsles om at HAN-måleren har vært borte lenge, bruk «HAN-måler online» med `for:`, eller `now() - states('sensor.…han_siste_data')` større enn 90 minutter.
 
 ### Sommer- og vintertid
@@ -188,14 +188,14 @@ Amperiums månedstall er lettere å misforstå enn de ser ut til. Dette er hva t
 
 Derfor regnes sensorene slik:
 
-- **Kraft + Nettleie før støtte** = Amperiums månedstotal (etter støtte) + støtten. Det er det samme som kraft (inkl. fast månedspris) + nettleie før støtte. Tallene er bygget på samme kilde, så før − støtte = etter. Støtten hentes sjeldnere enn månedstallene og kan henge inntil én time etter.
+- **Kraft + Nettleie før støtte** = Amperiums månedstotal (etter støtte) + støtten. Det er det samme som kraft (inkl. fast månedspris) + nettleie før støtte. Tallene er bygget på samme kilde, så før − støtte = etter. Fra 0.17.0 kommer støtten og månedstallene for «denne måneden» fra samme lesing og er alltid fra samme tidspunkt; før det kunne støtten henge inntil én time etter.
 - **Totalt med straumstøtte** = Amperiums månedstotal (som allerede er etter støtte og har den faste månedsprisen med).
 - **Totalt med Norgespris** = Amperiums månedstotal + straumstøtten lagt tilbake − Norgespris-kompensasjonen. Straumstøtte gjelder ikke på Norgespris. På en ekte faktura (september) ga det samme tall som «Totalt» i fakturaregnestykket Kraft + Nettleie − Norgespris.
 - **Norgespris sparer** = Norgespris-kompensasjon − straumstøtten som er trukket fra nettleien (`gridRent`, det som faktisk er trukket på fakturaen). Det finnes bare ett støttetall: «Straumstøtte denne måneden».
 
 Du velger ordningen (Norgespris eller straumstøtte) når du setter opp integrasjonen, og kan endre den under **Konfigurer**. «Totalt denne måneden (hittil)» bruker valgt ordning. Har du ikke valgt (eldre installasjon), er den utilgjengelig til du velger.
 
-Støtten leses uten hensyn til fortegn (den er alltid et fradrag). Tallene for **forrige måned** hentes fra samme kostnadssvar: nettleie etter støtte er `gridRent.totalAmount`, total er svarets `totalAmount`, og energi er differansen (avledet). Tallene er **omtrentlige**: kompensasjon og energi summeres fra hele timer, mens månedstallene kan ligge noen timer foran eller bak. Bruk dem som peiling, ikke som faktura. Eksempelkortet [`examples/lovelace-kostnad.yaml`](examples/lovelace-kostnad.yaml) viser oppsettet.
+Støtten leses uten hensyn til fortegn (den er alltid et fradrag). Tallene for **forrige måned** hentes fra samme kostnadssvar: nettleie etter støtte er `gridRent.totalAmount`, total er svarets `totalAmount`, og energi er differansen (avledet). Tallene er **omtrentlige**: kompensasjon og energi summeres fra hele timer, mens månedstallene kan ligge noen timer foran eller bak. Fra 0.17.0 gjelder alle hittil-tallene for «denne måneden» de samme timene (`til`), så de er ikke lenger skjeve mot hverandre. Bruk dem som peiling, ikke som faktura. Eksempelkortet [`examples/lovelace-kostnad.yaml`](examples/lovelace-kostnad.yaml) viser oppsettet.
 
 ### Strømregnskap: forrige måned og valgfri periode
 
@@ -362,15 +362,15 @@ Amperium bruker passordløs OTP-innlogging i tillegg til en statisk app-nøkkel 
 1. Ber om engangskode: `POST /api/accounts/login/request-otp`
 2. Logger inn: `POST /api/accounts/login/otp` → access- og refresh-token
 3. Fornyer ved behov: `POST /api/accounts/login/refresh-token` (kun når access-token er utløpt)
-4. Henter data: `GET /api/sites?charges_from=…&charges_to=…`
+4. Henter data: `GET /api/sites?charges_from=…&charges_to=…` (effekt nå, i dag, HAN-status og siste data; Kraft og Nettleie hittil kommer fra og med 0.17.0 fra punkt 7 for samme timer som forbruket)
 5. Henter timepriser: `GET /api/sites/{id}/prices?from=…&to=…` (i dag og i morgen)
 6. Henter timeforbruk: `GET /api/sites/{id}/consumption/energy?from=…&to=…&resolution=H`
 7. Henter kostnad: `GET /api/sites/{id}/consumption/charges?from=…&to=…&resolution=H`
 8. Live effekt (bare med Dobbe-modul): `POST /api/sites/{id}/stream/amqp`, og så kobler den til meldingskøen i svaret.
 
-`resolution` må være én bokstav (`H`, `D` eller `M`). Ord og tall avvises av API-et. Timedata hentes høyst en gang i timen.
+`resolution` må være én bokstav (`H`, `D` eller `M`). Ord og tall avvises av API-et. Timedata (forbruk, kostnad og priser) hentes hver time, og fra 0.17.0 også når Amperium melder nye forbruksdata (`updated` har endret seg), men ikke oftere enn hvert 10. minutt.
 
-Polling hvert 15. minutt (HAN-måleren oppdateres time for time). HAN-status (online, signal, siste data) leses i tillegg hvert 5. minutt med det samme kallet som punkt 4.
+Polling hvert 15. minutt (HAN-måleren oppdateres time for time). Kraft, Nettleie, Norgespris og Totalt «hittil» følger den timevise hentingen og ikke denne pollingen. HAN-status (online, signal, siste data) leses i tillegg hvert 5. minutt med det samme kallet som punkt 4.
 
 ## Sikkerhet
 
