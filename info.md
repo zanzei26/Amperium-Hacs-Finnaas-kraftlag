@@ -22,6 +22,7 @@ Strømforbruk, kostnad og pris **direkte fra Finnås Kraftlag** via Amperium-pla
 - HAN-status hvert 5. minutt, siste data fra HAN-måleren og antall timer Amperium mangler data for (diagnostikk)
 - Live-strøm som kommer tilbake av seg selv, med status-sensor og handlingen `amperium.koble_til_live`
 - Strømregnskap: nettleie før støtte, fast månedspris, Norgespris og snittpris for forrige måned, og handlingen `amperium.hent_periode` for valgfrie perioder
+- Fra 0.17.1: attributtet `til` står på alle «denne måneden»-sensorene som kommer fra øyeblikksbildet (også Nettleie før støtte, fast månedspris og kapasitet)
 - Fra 0.17.0: «denne måneden» (Kraft, Nettleie, Norgespris, Totalt, forbruk) kommer fra ett øyeblikksbilde og er lik `hent_periode` for samme tidsrom (`til`)
 - Fra 0.16.3: Norgespris bygges også fra timeprisene når alle timer har pris (retter 0,35 kr i oktober 2026 som skyldtes klokkeskiftet)
 - Fra 0.16.1: Kraft for forrige måned og i `hent_periode` bygges fra timeprisene når alle timer har pris (retter oktober 2026, som var 7,54 kr for lav hos Amperium)

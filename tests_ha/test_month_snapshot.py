@@ -15,6 +15,7 @@ from ha_helpers import advance, entity_id, make_entry, setup_entry, value
 from homeassistant.helpers import entity_registry as er  # noqa: F401  (entity_id uses it)
 
 from custom_components.amperium.const import DOMAIN
+from custom_components.amperium.sensor import MONTH_SNAPSHOT_KEYS
 
 HOUR = dt.timedelta(hours=1)
 LAST_WHOLE_HOUR_END = NOW.replace(minute=0, second=0)             # 2 October 10:00 UTC
@@ -114,3 +115,25 @@ async def test_this_months_kraft_follows_the_prices_when_amperiums_total_is_too_
     assert attrs(hass, entry, "cost_energy")["kilde"] == "priser"
     assert attrs(hass, entry, "cost_energy")["fra_amperium"] == pytest.approx(kraft - 7.54, abs=0.01)
     assert_agrees_with(hass, entry, await period(hass))
+
+
+async def test_every_figure_of_the_months_snapshot_says_how_far_it_goes(hass, api):
+    entry = await setup_entry(hass, make_entry(scheme="norgespris"))
+    checked = []
+    for key in sorted(MONTH_SNAPSHOT_KEYS):
+        state = hass.states.get(entity_id(hass, entry, key))
+        if state is None:                                    # a sensor that is off by default
+            continue
+        assert state.attributes.get("til") == LAST_WHOLE_HOUR_END.isoformat(), key
+        checked.append(key)
+    # the ones asked for: Nettleie before support, the fixed price and the capacity figures
+    assert {"grid_gross_month", "fixed_month", "capacity_avg_kw", "capacity_amount",
+            "capacity_headroom_kw", "cost_total", "cost_energy", "norgespris_month",
+            "net_cost_month", "energy_month"} <= set(checked)
+
+
+async def test_figures_that_are_not_part_of_the_snapshot_do_not_claim_a_til(hass, api):
+    entry = await setup_entry(hass, make_entry(scheme="norgespris"))
+    for key in ("cost_energy_last_month", "grid_gross_last_month", "norgespris_last_month",
+                "net_cost_last_month", "energy_today", "han_signal", "hours_missing_month"):
+        assert "til" not in attrs(hass, entry, key), key
