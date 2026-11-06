@@ -38,10 +38,12 @@ async def test_last_month_for_a_customer_on_the_regular_subsidy(hass, api):
 
 
 async def test_this_month_counts_the_fixed_price_once_and_gives_the_vat_on_it(hass, api):
-    """36 hours of October: 72 kWh, hourly energy 54.00, fixed price 25.00, grid rent 120.00."""
+    """36 hours of October: 72 kWh, hourly energy at the hours' own prices, fixed price 25.00, grid rent 120.00."""
     entry = await setup_entry(hass, make_entry(scheme="norgespris"))
+    hours = hours_between(OCT_START, NOW.replace(minute=0, second=0))
+    hourly = sum(2.0 * (0.5 + h.hour * 0.01 + 0.05) * 1.25 for h in hours)       # the hours only
     total = number(hass, entry, "cost_total")
-    assert total == pytest.approx(54.0 + 25.0 + 120.0)                  # Amperium's total, after subsidy
+    assert total == pytest.approx(hourly + 25.0 + 120.0)                # Amperium's total, after subsidy
     subsidy = number(hass, entry, "subsidy_applied_month")
     norgespris = number(hass, entry, "norgespris_month")
     # 2 kWh an hour, each hour's compensation is its spot price incl. VAT minus 0.50 (the fake's prices)
@@ -49,8 +51,8 @@ async def test_this_month_counts_the_fixed_price_once_and_gives_the_vat_on_it(ha
     assert (subsidy, norgespris) == (pytest.approx(40.0), pytest.approx(expected, abs=0.01))
     assert number(hass, entry, "net_cost_month") == pytest.approx(total + subsidy - norgespris)
     assert number(hass, entry, "gross_total_month") == pytest.approx(total + subsidy)
-    assert number(hass, entry, "energy_gross_month") == pytest.approx(54.0)       # the hours only
-    assert number(hass, entry, "vat_month") == pytest.approx(0.2 * (54.0 + 25.0))  # 20 % of the gross
+    assert number(hass, entry, "energy_gross_month") == pytest.approx(hourly)     # the hours only
+    assert number(hass, entry, "vat_month") == pytest.approx(0.2 * (hourly + 25.0))  # 20 % of the gross
 
 
 async def test_the_fixed_price_sensor_is_named_for_what_it_is(hass, api):

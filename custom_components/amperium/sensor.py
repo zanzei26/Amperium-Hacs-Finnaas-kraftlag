@@ -710,6 +710,12 @@ def _cap_attributes(detail: dict[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
+def _until(data: dict[str, Any]) -> str | None:
+    """Where this month's figures end (they all cover the 1st up to this moment), as an ISO string."""
+    until = data.get("month_until")
+    return until.isoformat() if hasattr(until, "isoformat") else None
+
+
 def _round(value: Any, digits: int) -> Any:
     """Round numeric values, pass through None."""
     if value is None:
@@ -910,7 +916,17 @@ class AmperiumSensor(CoordinatorEntity[AmperiumCoordinator], SensorEntity):
         if not data:
             return None
         if key == "energy_month":
-            return {"updated": data.get("updated")}
+            return {"updated": data.get("updated"), "til": _until(data)}
+        if key == "cost_energy":
+            if data.get("month_kraft_source") is None:
+                return None
+            return {
+                "til": _until(data),
+                "kilde": data.get("month_kraft_source"),
+                "fra_amperium": _round(data.get("month_kraft_amperium"), 2),
+            }
+        if key in ("cost_total", "cost_grid_rent", "net_cost_month"):
+            return {"til": _until(data)} if data.get("month_until") is not None else None
         if key == "hours_missing_month":
             return {"hours": data.get("hours_missing_list", [])}
         if key == "energy_last_hour":
@@ -984,6 +1000,8 @@ class AmperiumSensor(CoordinatorEntity[AmperiumCoordinator], SensorEntity):
             if data.get(f"norgespris_{suffix}_source") is not None:
                 attrs["kilde"] = data.get(f"norgespris_{suffix}_source")
                 attrs["fra_amperium"] = _round(data.get(f"norgespris_{suffix}_amperium"), 2)
+            if suffix == "month" and data.get("month_until") is not None:
+                attrs["til"] = _until(data)
             return attrs or None
         return None
 

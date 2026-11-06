@@ -28,6 +28,7 @@ from .const import (
     DEFAULT_DAY_START,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    EXTENDED_MIN_INTERVAL,
     EXTENDED_SCAN_INTERVAL,
     ISSUE_LOGIN_EXPIRING,
     MISSING_HOURS_GRACE,
@@ -37,6 +38,7 @@ from .const import (
 from .derived import (
     capacity_peaks,
     changed_hours,
+    complete_hours,
     current_price_bucket,
     days_until,
     local_month_bounds,
@@ -75,6 +77,8 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._last_month_prices: tuple[Any, list[dict[str, Any]]] | None = None
         self._extended: dict[str, Any] = {}
         self._extended_at: datetime | None = None
+        # The ``updated`` time Amperium gave when the hourly figures were last read.
+        self._extended_updated: Any = None
         # (year, month) the extended values belong to; a new month starts empty
         # so last month's peaks and totals are not shown as this month's.
         self._extended_month: tuple[int, int] | None = None
@@ -163,7 +167,9 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.client.access_expires_at or ""
         )
         data.update(await self._async_fetch_prices())
-        data.update(await self._async_fetch_extended(bool(data.get("is_producing"))))
+        data.update(
+            await self._async_fetch_extended(bool(data.get("is_producing")), data.get("updated"))
+        )
         self._check_login_expiry()
 
         return data
@@ -306,19 +312,29 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return unknown_norgespris(response["energy"])
         return apply_cap(hourly, energy_part, now, tz)
 
-    async def _async_fetch_extended(self, producing: bool) -> dict[str, Any]:
+    async def _async_fetch_extended(
+        self, producing: bool, updated: Any = None
+    ) -> dict[str, Any]:
         """Fetch hourly consumption/charges and the Norgespris comparison.
 
-        Heavier than the main poll, so it runs at most once per
-        EXTENDED_SCAN_INTERVAL. Everything here is an extra: errors are logged
+        Heavier than the main poll, so it runs at most once per EXTENDED_SCAN_INTERVAL, or sooner
+        (but not within EXTENDED_MIN_INTERVAL of the last time) when Amperium says there is new
+        consumption data (``updated`` has changed). Everything here is an extra: errors are logged
         and the last good values are kept, so the main sensors keep working.
+
+        This month's totals are taken from the same read as the hours (see the snapshot below), so
+        they never disagree with each other.
         """
         now = dt_util.utcnow()
-        if (
-            self._extended_at is not None
-            and (now - self._extended_at).total_seconds() < EXTENDED_SCAN_INTERVAL
-        ):
-            return self._extended
+        if self._extended_at is not None:
+            age = (now - self._extended_at).total_seconds()
+            new_data = (
+                updated is not None
+                and updated != self._extended_updated
+                and age >= EXTENDED_MIN_INTERVAL
+            )
+            if age < EXTENDED_SCAN_INTERVAL and not new_data:
+                return self._extended
 
         tz = dt_util.DEFAULT_TIME_ZONE
         prev_start, this_start, _ = local_month_bounds(now.astimezone(tz))
@@ -333,6 +349,10 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         grid_responses: dict[str, dict[str, Any] | None] = {"": None, "_last_month": None}
         energy_ok = False
         this_month_ok = False
+        # Where this month's figures end: the end of the last whole hour that has consumption. The
+        # costs and the prices are read for exactly that window, so every figure of the month
+        # (Kraft, Nettleie, Norgespris, kWh) covers the same hours.
+        snapshot_end: datetime | None = None
         try:
             for start, end in windows:
                 if end <= start:
@@ -343,6 +363,10 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     energy += energy_part
                     energy_ok = True
                     this_month_ok = this_month_ok or start == this_start
+                    if start == this_start:
+                        whole = [b for b in complete_hours(energy_part, now) if b["start"] >= this_start]
+                        if whole:
+                            snapshot_end = end = whole[-1]["end"]
                 except AmperiumAuthError:
                     raise
                 except AmperiumError as err:
@@ -385,7 +409,7 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # The consumption-weighted spot price, and what lies above the Norgespris ceiling, from
         # the hourly prices of each month. Left out (the last good values stay) without prices.
         for suffix, (start, end) in (
-            ("month", (this_start, hour_now)),
+            ("month", (this_start, snapshot_end or hour_now)),
             ("last_month", (prev_start, this_start)),
         ):
             prices = month_prices.get(start)
@@ -416,7 +440,7 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # hourly figures leave out the hours around a clock change. It is only used when it is close to
         # Amperium's own (see spot.trusted_norgespris) and every hour has consumption and a price.
         for suffix, (start, end) in (
-            ("month", (this_start, hour_now)),
+            ("month", (this_start, snapshot_end or hour_now)),
             ("last_month", (prev_start, this_start)),
         ):
             amperium_np = new.get(f"norgespris_{suffix}")
@@ -428,6 +452,31 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             new[f"norgespris_{suffix}_source"] = "priser" if use else "amperium"
             if use:
                 new[f"norgespris_{suffix}"] = rebuilt_np[0]
+        # This month's totals from the same read as the hours. /api/sites gives them every 15 minutes
+        # but as of a different moment than the hourly figures, so Kraft, Nettleie and Norgespris
+        # could disagree by an hour's worth. Here they all cover [the 1st, snapshot_end), exactly
+        # what amperium.hent_periode gives for that period. Without the snapshot (no whole hour yet,
+        # or the read failed) the /api/sites figures stay.
+        response = grid_responses[""]
+        if snapshot_end is not None and response and response.get("grid"):
+            outer, grid_total = response.get("outer_total"), response["grid"].get("total")
+            if outer is not None and grid_total is not None:
+                from_amperium = float(outer) - float(grid_total)
+                rebuilt_month = kraft_from_prices(
+                    energy, month_prices.get(this_start), this_start, snapshot_end, now,
+                    response.get("fixed_total"),
+                )
+                kraft = from_amperium if rebuilt_month is None else rebuilt_month[0]
+                new["cost_energy"] = kraft
+                new["cost_grid_rent"] = float(grid_total)
+                new["cost_total"] = kraft + float(grid_total)
+                new["energy_month"] = sum(
+                    b["import"] for b in complete_hours(energy, now)
+                    if this_start <= b["start"] < snapshot_end
+                )
+                new["month_until"] = snapshot_end
+                new["month_kraft_amperium"] = from_amperium
+                new["month_kraft_source"] = "amperium" if rebuilt_month is None else "priser"
         # The billing split of day/night kWh comes straight from Amperium
         # (gridRent); prefer it over our own hour-of-day classification.
         for api_key, own_key in (
@@ -452,4 +501,5 @@ class AmperiumCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._extended.update(new)
         if energy_ok:
             self._extended_at = now
+            self._extended_updated = updated
         return self._extended
