@@ -682,6 +682,8 @@ def summarise_period(
     *,
     kraft_override: float | None = None,
     vat_override: float | None = None,
+    norgespris_override: float | None = None,
+    norgespris_kwh_override: float | None = None,
 ) -> dict[str, Any]:
     """Cost and consumption for one free period [start, end), for a landlord's accounts.
 
@@ -695,7 +697,9 @@ def summarise_period(
 
     ``kraft_override`` (and ``vat_override``) replace Amperium's Kraft with one rebuilt from the
     hourly prices (see ``spot.kraft_from_prices``); everything that is made from Kraft follows.
-    Amperium's own figure stays in ``energy_gross_amperium``.
+    Amperium's own figure stays in ``energy_gross_amperium``. ``norgespris_override`` (and the kWh
+    under the ceiling, ``norgespris_kwh_override``) do the same for the Norgespris compensation (see
+    ``spot.norgespris_from_prices``); Amperium's own stays in ``norgespris_compensation_amperium``.
     """
     charges = charges or {}
     warnings: list[str] = []
@@ -718,6 +722,14 @@ def summarise_period(
     norgespris_kwh = sum(counted) if counted else None
     charge_starts = {b["start"] for b in charge_hours}
     kwh_in_charge_hours = sum(b["import"] for b in hours if b["start"] in charge_starts)
+    norgespris_amperium = norgespris
+    if norgespris_override is not None:
+        # Rebuilt from the prices: every hour counts, also one that has no cost row.
+        norgespris = norgespris_override
+        norgespris_unknown = False
+        if norgespris_kwh_override is not None:
+            norgespris_kwh = norgespris_kwh_override
+        kwh_in_charge_hours = kwh
 
     grid = charges.get("grid") or {}
     grid_after = grid.get("total")
@@ -802,6 +814,8 @@ def summarise_period(
         ),
         "fixed_monthly_price": _r(fixed, 2),
         "norgespris_compensation": _r(norgespris, 2),
+        "norgespris_compensation_amperium": _r(norgespris_amperium, 2),
+        "norgespris_kilde": "amperium" if norgespris_override is None else "priser",
         "norgespris_kwh": _r(norgespris_kwh, 3),
         "house_cost_norgespris": _r(cost_norgespris, 2),
         "house_cost_subsidy": _r(cost_subsidy, 2),

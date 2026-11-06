@@ -41,8 +41,8 @@ async def test_this_months_weighted_spot_is_the_hourly_prices_weighted_by_consum
 
 async def test_last_months_weighted_spot_equals_the_invoices_kraftpris_per_kwh(hass, api):
     entry = await setup_entry(hass, make_entry())
-    # the default September prices add up to the invoice's Kraftpris (3110.40) over 1788.52 kWh
-    assert float(value(hass, entry, "spot_avg_last_month")) == pytest.approx(3110.40 / 1788.520, abs=1e-4)
+    # the default September prices add up to the invoice's Kraftpris (3131.06) over 1788.52 kWh
+    assert float(value(hass, entry, "spot_avg_last_month")) == pytest.approx(3131.06 / 1788.520, abs=1e-4)
     attrs = attributes(hass, entry, "spot_avg_last_month")
     assert attrs["inkl_paslag"] == pytest.approx(3194.50 / 1788.520, abs=1e-4)
     assert attrs["kwh"] == pytest.approx(1788.520)

@@ -8,7 +8,7 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
-from fake_api import OCT_START
+from fake_api import NOW, OCT_START, hours_between, spot_incl
 from ha_helpers import entity_id, make_entry, setup_entry, value
 from homeassistant.helpers import entity_registry as er
 
@@ -44,7 +44,9 @@ async def test_this_month_counts_the_fixed_price_once_and_gives_the_vat_on_it(ha
     assert total == pytest.approx(54.0 + 25.0 + 120.0)                  # Amperium's total, after subsidy
     subsidy = number(hass, entry, "subsidy_applied_month")
     norgespris = number(hass, entry, "norgespris_month")
-    assert (subsidy, norgespris) == (pytest.approx(40.0), pytest.approx(21.6))
+    # 2 kWh an hour, each hour's compensation is its spot price incl. VAT minus 0.50 (the fake's prices)
+    expected = sum(2.0 * (spot_incl(h) - 0.50) for h in hours_between(OCT_START, NOW.replace(minute=0, second=0)))
+    assert (subsidy, norgespris) == (pytest.approx(40.0), pytest.approx(expected, abs=0.01))
     assert number(hass, entry, "net_cost_month") == pytest.approx(total + subsidy - norgespris)
     assert number(hass, entry, "gross_total_month") == pytest.approx(total + subsidy)
     assert number(hass, entry, "energy_gross_month") == pytest.approx(54.0)       # the hours only

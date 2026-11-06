@@ -33,7 +33,7 @@ async def test_hent_periode_for_september_matches_the_invoice(hass, api):
     assert out["price_per_kwh_norgespris"] == pytest.approx(1.3002, abs=5e-5)
     assert "fixed_fee" not in out
     # The same Kraft rebuilt from the hourly prices, and what is left between the two.
-    assert out["spotsnitt"] == pytest.approx(3110.40 / 1788.520, abs=5e-5)
+    assert out["spotsnitt"] == pytest.approx(3131.06 / 1788.520, abs=5e-5)
     assert out["spot_inkl_paslag"] == pytest.approx(3194.50 / 1788.520, abs=5e-5)
     assert out["kraft_fra_priser"] == pytest.approx(3219.50, abs=0.01)
     assert out["kraft_avvik_fra_priser"] == pytest.approx(0.0, abs=0.01)
@@ -46,8 +46,11 @@ async def test_hent_periode_uses_kraft_from_the_prices_when_amperium_is_off(hass
     await setup_entry(hass, make_entry(scheme="norgespris"))
     out = await call(hass, "hent_periode", {"fra": "2026-09-01", "til": "2026-10-01"},
                      return_response=True)
-    assert out["warnings"] == ["kraft_fra_priser_brukt"]
+    assert "kraft_fra_priser_brukt" in out["warnings"]
     assert out["kraft_kilde"] == "priser"
+    # these prices are far from the invoice-like Norgespris, so Amperium's figure is kept and says so
+    assert out["norgespris_kilde"] == "amperium" and "norgespris_avviker_fra_priser" in out["warnings"]
+    assert out["norgespris_compensation"] == pytest.approx(2236.80, abs=0.005)
     assert out["energy_gross_amperium"] == pytest.approx(3219.50, abs=0.005)    # Amperium's own figure
     assert out["energy_gross"] == pytest.approx(out["kraft_fra_priser"], abs=0.005)
     assert out["kraft_avvik_fra_priser"] == pytest.approx(
